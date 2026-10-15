@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>iDrive</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#09090b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="iDrive">
+  <link rel="apple-touch-icon" href="./assets/icons/icon-180.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Design Tokens per Alto Contrasto e Tema Scuro/Chiaro */
+    :root {
+      --bg-screen: #000000;
+      --bg-main: #09090b;
+      --bg-header: rgba(10, 10, 12, 0.95);
+      --bg-card: rgba(24, 24, 27, 0.9);
+      --bg-sub: rgba(18, 18, 20, 0.9);
+      --border-color: #27272a;
+      --text-main: #ffffff;
+      --text-sub: #a1a1aa;
+      --text-muted: #71717a;
+      --tab-bg: rgba(10, 10, 12, 0.92);
+      --cal-day-bg: #18181b;
+      --cal-day-text: #e4e4e7;
+      --modal-bg: #18181b;
+      --input-bg: #09090b;
+      --input-text: #ffffff;
+      --input-border: #27272a;
+    }
+
+    body.theme-light {
+      --bg-screen: #e4e4e7;
+      --bg-main: #f4f4f5;
+      --bg-header: rgba(255, 255, 255, 0.96);
+      --bg-card: #ffffff;
+      --bg-sub: rgba(244, 244, 246, 0.96);
+      --border-color: #e4e4e7;
+      --text-main: #09090b;
+      --text-sub: #52525b;
+      --text-muted: #71717a;
+      --tab-bg: rgba(255, 255, 255, 0.96);
+      --cal-day-bg: #ffffff;
+      --cal-day-text: #09090b;
+      --modal-bg: #ffffff;
+      --input-bg: #f4f4f5;
+      --input-text: #09090b;
+      --input-border: #d4d4d8;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 9999px; }
+    body {
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: 0;
+    }
+    #appHeader {
+      padding-top: max(calc(env(safe-area-inset-top) + 8px), 52px);
+    }
+    #appNav {
+      padding-bottom: max(env(safe-area-inset-bottom), 14px);
+      -webkit-backdrop-filter: blur(25px) saturate(180%);
+      backdrop-filter: blur(25px) saturate(180%);
+    }
+    #contentArea {
+      padding-bottom: calc(72px + max(env(safe-area-inset-bottom), 14px));
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.2); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-dot { animation: pulse-ring 2s infinite ease-in-out; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #modalPdfReport, #modalPdfReport * { visibility: visible; }
+      #modalPdfReport { position: absolute; left: 0; top: 0; width: 100%; height: auto; background: white; color: black; }
+    }
+  </style>
+</head>
+<body id="appBody" class="bg-[var(--bg-screen)] text-[var(--text-main)] antialiased min-h-screen flex flex-col items-center justify-start pb-0 sm:py-6 sm:px-4 selection:bg-amber-500 selection:text-black transition-colors duration-300">
+
+  <!-- Main App Shell -->
+  <main id="appMain" class="w-full max-w-lg bg-[var(--bg-main)] border-x sm:border border-[var(--border-color)] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col min-h-screen sm:min-h-[860px] relative transition-colors duration-300">
+    
+    <!-- Top Bar: Header & Controls -->
+    <header id="appHeader" class="bg-[var(--bg-header)] backdrop-blur-xl px-3.5 pb-3 border-b border-[var(--border-color)] sticky top-0 z-30 space-y-2.5 transition-colors duration-300">
+      <div class="flex items-center justify-between gap-2.5">
+        <!-- Logo + Nome iDrive -->
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl overflow-hidden shadow-md border border-white/15 bg-black/40 flex-shrink-0 flex items-center justify-center p-0.5">
+            <img src="./assets/icons/icon-192.png" alt="iDrive Logo" class="w-full h-full object-cover rounded-xl shadow-inner">
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h1 class="text-base font-black leading-none tracking-tight text-[var(--text-main)]">iDrive</h1>
+              <span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30">PRO</span>
+            </div>
+            <p class="text-[10px] text-[var(--text-muted)] mt-0.5 font-medium">Gestione Spese • 3 Auto</p>
+          </div>
+        </div>
+
+        <!-- Tasti Rapidi Azioni Superiori -->
+        <div class="flex items-center gap-1.5">
+          <!-- Toggle Tema (Dark / Light) -->
+          <button onclick="toggleAppTheme()" id="btnThemeToggle" title="Cambia tema chiaro/scuro" class="min-h-[36px] min-w-[36px] px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)] transition flex items-center justify-center shadow-sm active:scale-95">
+            <span id="themeEmoji">🌙</span>
+          </button>
+
+          <!-- Bluetooth Auto-Start Trigger -->
+          <button id="btnHeaderBt" onclick="toggleBtSim()" title="Simula Aggancio/Disconnessione Bluetooth Auto" class="min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-400 flex items-center gap-1 transition shadow-sm active:scale-95">
+            <span class="text-xs">📶</span> <span id="btHeaderLabel">BT Auto</span>
+          </button>
+
+          <!-- GPS Live Button -->
+          <button id="btnHeaderGps" onclick="toggleGpsLive()" class="min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] flex items-center gap-1 transition shadow-sm active:scale-95">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> GPS
+          </button>
+
+          <!-- Assistente Vocale Gemini AI -->
+          <button id="btnHeaderGemini" onclick="openModalGeminiVoice()" title="Assistente Vocale Gemini AI" class="min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500/15 to-indigo-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 border border-purple-500/30 text-purple-300 flex items-center gap-1 transition shadow-sm active:scale-95">
+            <span class="text-xs">✨</span> <span>AI</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Garage Personale: 3 Macchine Modificabili -->
+      <div class="space-y-1.5 pt-0.5">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Garage Personale (3 Veicoli)</span>
+          <button onclick="openModalEditCar(activeCarIndex)" class="text-[10px] font-semibold text-amber-500 hover:text-amber-400 flex items-center gap-1 transition py-0.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            Modifica Auto
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1.5 w-full">
+          <button onclick="switchCar(0)" id="pillCar0" class="flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-bold bg-amber-500 text-black flex items-center justify-center gap-1 transition truncate shadow-md active:scale-95">
+            🚗 <span id="pillCarLabel0" class="truncate">Auto 1</span>
+          </button>
+          <button onclick="switchCar(1)" id="pillCar1" class="flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-medium bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center gap-1 transition truncate active:scale-95">
+            🚗 <span id="pillCarLabel1" class="truncate">Auto 2</span>
+          </button>
+          <button onclick="switchCar(2)" id="pillCar2" class="flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-medium bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center gap-1 transition truncate active:scale-95">
+            🚗 <span id="pillCarLabel2" class="truncate">Auto 3</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Banner Avviso Assicurazione a 14 Giorni (Nascosto se nessuna scadenza) -->
+    <div id="bannerInsuranceAlert" class="hidden bg-amber-500/15 border-b border-amber-500/30 px-3.5 py-2 flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 z-20 transition">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+        <span class="text-[11px] font-bold">🚨 Assicurazione in scadenza tra 14 giorni!</span>
+      </div>
+      <button onclick="switchTab('insurance')" class="text-[10px] font-extrabold underline hover:text-amber-300">Dettagli</button>
+    </div>
+
+    <!-- Sub-bar Odometro & Auto Attiva -->
+    <div id="subBar" class="bg-[var(--bg-sub)] px-4 py-2 border-b border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)] transition-colors duration-300">
+      <div class="flex items-center gap-2">
+        <span id="labelCarFuel" class="font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded text-[10px] border border-amber-500/20">Gasolio</span>
+        <span>Odometro:</span>
+        <span id="labelCarOdo" class="font-bold text-[var(--text-main)] font-mono">0 km</span>
+      </div>
+      <button onclick="openModalEditCar(activeCarIndex)" class="text-[10px] text-[var(--text-muted)] hover:text-amber-500">
+        ✏️ Modifica
+      </button>
+    </div>
+
+    <!-- Active GPS Banner -->
+    <div id="liveGpsBanner" class="hidden bg-emerald-950/80 border-b border-emerald-500/30 px-4 py-2.5 flex items-center justify-between sticky top-[135px] z-20 backdrop-blur-sm">
+      <div class="flex items-center gap-2.5">
+        <span class="w-3 h-3 rounded-full bg-emerald-400 pulse-dot"></span>
+        <div>
+          <div class="text-xs font-semibold text-emerald-300">Viaggio in Corso (GPS Live)</div>
+          <div class="text-[11px] text-emerald-400/90 font-mono"><span id="gpsLiveKm">0.00</span> km • <span id="gpsLiveTimer">00:00</span></div>
+        </div>
+      </div>
+      <button onclick="stopGpsLive()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black transition">
+        Termina & Salva
+      </button>
+    </div>
+
+    <!-- Floating Notification Banner (iOS 8:00 AM Resoconto 24h & Assicurazione) -->
+    <div id="iosNotificationBanner" class="hidden absolute top-16 left-3 right-3 z-50 bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl p-3 shadow-2xl flex items-start gap-2.5 transition-all">
+      <div class="w-8 h-8 rounded-xl bg-amber-500 text-black flex items-center justify-center font-bold text-sm shadow">
+        ⛽
+      </div>
+      <div class="flex-1">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-[var(--text-main)]">iDrive • Notifica</span>
+          <span class="text-[10px] text-[var(--text-muted)]">Adesso</span>
+        </div>
+        <div id="notifBannerMessage" class="text-xs text-[var(--text-sub)] mt-0.5 leading-snug">
+          <b>Benvenuto in iDrive:</b> Registra i tuoi rifornimenti e percorsi per visualizzare le statistiche del tuo garage!
+        </div>
+        <div class="mt-2 flex gap-2">
+          <button onclick="openModal('modalPdfReport'); closeNotificationBanner();" class="px-2.5 py-1 rounded-lg bg-amber-500 text-black text-[10px] font-bold">
+            📄 Apri Report PDF
+          </button>
+          <button onclick="closeNotificationBanner()" class="px-2 py-1 text-[10px] text-[var(--text-muted)]">
+            Ignora
+          </button>
+        </div>
+      </div>
+      <button onclick="closeNotificationBanner()" class="text-zinc-400 hover:text-zinc-600 text-xs">✕</button>
+    </div>
+
+    <!-- Scrollable Content Area -->
+    <div id="contentArea" class="flex-1 overflow-y-auto p-3.5 space-y-4 pb-24 transition-colors duration-300">
+
+      <!-- ==================== TAB 1: DASHBOARD & GRAFICI ==================== -->
+      <section id="tab-dashboard" class="space-y-3.5">
+        
+        <!-- 4 Grid KPI Cards -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-2xl shadow-sm space-y-0.5">
+            <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+              <span>Spesa Carburante</span>
+              <span class="text-amber-500 text-sm">⛽</span>
+            </div>
+            <div id="kpiFuelTotal" class="text-xl font-black text-[var(--text-main)]">€ 218,50</div>
+            <div class="text-[9px] text-[var(--text-muted)]">Mese corrente</div>
+          </div>
+
+          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-2xl shadow-sm space-y-0.5">
+            <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+              <span>Km Totali Percorsi</span>
+              <span class="text-blue-500 text-sm">🛣️</span>
+            </div>
+            <div id="kpiKmTotal" class="text-xl font-black text-[var(--text-main)]">2.180 km</div>
+            <div class="text-[9px] text-emerald-500 font-semibold">Tutti i viaggi</div>
+          </div>
+
+          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-2xl shadow-sm space-y-0.5">
+            <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+              <span>Consumo Reale</span>
+              <span class="text-emerald-500 text-sm">⚡</span>
+            </div>
+            <div id="kpiEfficiency" class="text-xl font-black text-emerald-500">5.62 L/100km</div>
+            <div id="kpiLiters100" class="text-[9px] text-[var(--text-muted)] font-mono">17.8 km/l</div>
+          </div>
+
+          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-2xl shadow-sm space-y-0.5">
+            <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+              <span>Costo Vivo/Km</span>
+              <span class="text-purple-500 text-sm">💶</span>
+            </div>
+            <div id="kpiCostKm" class="text-xl font-black text-[var(--text-main)]">€ 0,100 /km</div>
+            <div class="text-[9px] text-[var(--text-muted)]">Spesa reale gasolio</div>
+          </div>
+        </div>
+
+        <!-- Box Autonomia & Spesa Media Viaggio -->
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3.5 rounded-2xl shadow-sm space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-[var(--text-main)] flex items-center gap-1.5">
+              <span>📊 Auto Attiva:</span>
+              <span id="activeCarSummaryLabel" class="text-amber-500">Auto 1</span>
+            </span>
+            <button onclick="openModalEditCar(activeCarIndex)" class="text-[10px] text-[var(--text-muted)] hover:text-amber-500">
+              ✏️ Modifica
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-1 border-t border-[var(--border-color)]">
+            <div>
+              <div class="text-[10px] text-[var(--text-muted)]">Autonomia Stimata con Pieno</div>
+              <div class="text-base font-bold text-emerald-500 font-mono">~ 860 km</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-[var(--text-muted)]">Costo Medio per Viaggio</div>
+              <div id="labelAvgTripCost" class="text-base font-bold text-[var(--text-main)] font-mono">~ € 3,45</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottoni Rapidi Inserimento -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <button onclick="openModal('modalRefuel')" class="py-3 px-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 transition active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            + Rifornimento
+          </button>
+          <button onclick="openModal('modalTrip')" class="py-3 px-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-500/10 transition active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            + Registra Viaggio
+          </button>
+        </div>
+
+        <!-- Banner Assistente Vocale Gemini AI -->
+        <div onclick="openModalGeminiVoice()" class="p-3 rounded-2xl bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-blue-950/40 border border-purple-500/30 flex items-center justify-between cursor-pointer hover:border-purple-400/60 transition shadow-sm active:scale-[0.99] group">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-md shadow-purple-500/20 group-hover:scale-105 transition">
+              ✨
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                <span>Assistente Vocale Gemini</span>
+                <span class="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">AI Live</span>
+              </div>
+              <div class="text-[10px] text-zinc-300">Detta o scrivi: estrae percorso, tempo e km</div>
+            </div>
+          </div>
+          <button type="button" class="px-2.5 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 group-hover:bg-purple-500 group-hover:text-black font-bold text-[10.5px] flex items-center gap-1 transition">
+            <span>🎙️ Parla</span>
+          </button>
+        </div>
+
+        <!-- Feed Attività Recenti -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-2">
+              <h2 class="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Ultime Attività</h2>
+              <span class="text-[9.5px] font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">👈 Scorri per eliminare</span>
+            </div>
+            <button onclick="switchTab('stats')" class="text-[11px] text-amber-500 hover:underline">Report PDF →</button>
+          </div>
+          <div id="unifiedFeedList" class="space-y-2">
+            <!-- Popolato via JS -->
+          </div>
+        </div>
+
+        <!-- Signature Credit Footer -->
+        <div class="pt-2 pb-2 text-center">
+          <p class="text-[10px] tracking-widest uppercase font-semibold text-[var(--text-muted)] opacity-80">
+            development Gabriele Ponziano
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: RIFORNIMENTI ==================== -->
+      <section id="tab-refuels" class="space-y-3 hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-[var(--text-main)]">Rifornimenti Carburante</h2>
+            <p class="text-[11px] text-[var(--text-muted)]">Calcolo consumi ed efficienza</p>
+          </div>
+          <button onclick="openModal('modalRefuel')" class="px-3 py-1.5 rounded-xl text-xs bg-amber-500 hover:bg-amber-400 text-black font-bold transition">
+            + Aggiungi
+          </button>
+        </div>
+
+        <!-- ==================== SEZIONE GRAFICO ANDAMENTO CARBURANTE ==================== -->
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3.5 rounded-2xl shadow-sm space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-xs font-bold text-[var(--text-main)]">Andamento Spese Carburante</h3>
+              <p class="text-[10px] text-[var(--text-muted)]">Passa il dito sul grafico per i dettagli esatti</p>
+            </div>
+
+            <!-- Switcher: Singola Auto vs Tutte (3 Auto) -->
+            <div class="flex items-center bg-[var(--bg-sub)] p-0.5 rounded-xl border border-[var(--border-color)] text-[10px]">
+              <button onclick="switchChartMode('single')" id="btnChartSingle" class="px-2 py-0.5 rounded-lg font-bold bg-amber-500 text-black transition">
+                Singola
+              </button>
+              <button onclick="switchChartMode('all')" id="btnChartAll" class="px-2 py-0.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
+                Tutte (3 Auto)
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Live Data Display Card (Valore al tocco del dito) -->
+          <div id="chartTooltipCard" class="bg-[var(--bg-sub)] px-3 py-2 rounded-xl border border-[var(--border-color)] flex items-center justify-between text-xs transition-all min-h-[46px]">
+            <!-- Popolato da JS -->
+          </div>
+
+          <!-- Canvas del Grafico Interattivo con Touch Scrubber -->
+          <div class="relative w-full h-[155px] bg-[var(--bg-sub)] rounded-xl p-1 border border-[var(--border-color)] overflow-hidden select-none">
+            <canvas id="fuelExpenseChart" width="800" height="310" class="w-full h-full block touch-none cursor-crosshair"></canvas>
+          </div>
+
+          <!-- Legenda Grafico & Istruzioni -->
+          <div id="chartLegend" class="flex items-center justify-between text-[10px] text-[var(--text-muted)] px-1">
+            <span class="flex items-center gap-1.5 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> <span id="legendCarLabel">Auto 1</span></span>
+            <span class="text-[9px] text-[var(--text-muted)] flex items-center gap-1">👆 Trascina il dito</span>
+          </div>
+        </div>
+
+        <div id="refuelsListContainer" class="space-y-2">
+          <!-- Popolato via JS -->
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: PERCORSI ==================== -->
+      <section id="tab-trips" class="space-y-3 hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-[var(--text-main)]">Diario Viaggi Personali</h2>
+            <p class="text-[11px] text-[var(--text-muted)]">Chilometri, consumi e tratte registrate</p>
+          </div>
+          <button onclick="openModal('modalTrip')" class="px-3 py-1.5 rounded-xl text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold transition active:scale-95">
+            + Nuovo Viaggio
+          </button>
+        </div>
+
+        <!-- KPI Riepilogo Viaggi Auto Attiva -->
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-2.5 rounded-2xl shadow-sm text-center">
+            <div class="text-[9.5px] text-[var(--text-muted)] font-semibold">Km Viaggi</div>
+            <div id="tripSummaryKm" class="text-base font-black font-mono text-[var(--text-main)] mt-0.5">199 km</div>
+          </div>
+          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-2.5 rounded-2xl shadow-sm text-center">
+            <div class="text-[9.5px] text-[var(--text-muted)] font-semibold">Spesa Tratte</div>
+            <div id="tripSummaryCost" class="text-base font-black font-mono text-amber-500 mt-0.5">€ 19,90</div>
+          </div>
+          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-2.5 rounded-2xl shadow-sm text-center">
+            <div class="text-[9.5px] text-[var(--text-muted)] font-semibold">N° Viaggi</div>
+            <div id="tripSummaryCount" class="text-base font-black font-mono text-blue-400 mt-0.5">3</div>
+          </div>
+        </div>
+
+        <!-- CARD AUTO-START BLUETOOTH -->
+        <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/10 via-[var(--bg-card)] to-[var(--bg-card)] border border-indigo-500/30 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm">
+                📶
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-[var(--text-main)]">Auto-Start Bluetooth</span>
+                  <span id="btActiveBadge" class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-750 text-zinc-300 border border-zinc-700">Standby</span>
+                </div>
+                <div class="text-[10px] text-[var(--text-muted)]">Vivavoce Associato: <b id="btDeviceNameLabel" class="text-indigo-400">VW BT 4821</b></div>
+              </div>
+            </div>
+
+            <!-- Toggle Abilita/Disabilita -->
+            <label class="relative inline-flex items-center cursor-pointer" title="Attiva/Disattiva Auto-Start">
+              <input type="checkbox" id="toggleBtAutoStart" checked class="sr-only peer">
+              <div class="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
+
+          <!-- Box Viaggio in corso quando connesso a BT -->
+          <div id="btLiveTripBox" class="hidden p-3 rounded-xl bg-indigo-500/15 border border-indigo-500/40 space-y-1">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-indigo-400 font-bold flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
+                Tracciamento Background in Corso...
+              </span>
+              <span id="btLiveTimer" class="font-mono font-bold text-[var(--text-main)]">00:00</span>
+            </div>
+            <div class="flex justify-between items-baseline">
+              <span class="text-[11px] text-[var(--text-muted)]">Distanza registrata:</span>
+              <span id="btLiveKm" class="text-lg font-black font-mono text-indigo-400">0.0 km</span>
+            </div>
+          </div>
+
+          <!-- Controlli di Simulazione Bluetooth -->
+          <div class="grid grid-cols-2 gap-2.5 pt-0.5">
+            <button id="btnBtConnect" onclick="triggerBtConnect()" class="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow-sm">
+              <span>🚗</span>
+              <span>Connetti BT</span>
+            </button>
+            <button id="btnBtDisconnect" onclick="triggerBtDisconnect()" disabled class="py-2.5 px-3 rounded-xl bg-zinc-800 text-zinc-500 font-bold text-xs flex items-center justify-center gap-1.5 transition">
+              <span>🅿️</span>
+              <span>Scollega & Sosta</span>
+            </button>
+          </div>
+
+          <div class="flex justify-between items-center pt-0.5 text-[10px] text-[var(--text-muted)]">
+            <span>Avvio automatico alla guida • Sosta salvata al distacco</span>
+            <button onclick="openModal('modalIosShortcuts')" class="text-indigo-400 hover:underline font-semibold flex items-center gap-0.5">
+              Guida iOS ⓘ
+            </button>
+          </div>
+        </div>
+
+        <!-- CARD ULTIMA SOSTA & PARCHEGGIO SALVATO CON MAPPA INTEGRATA -->
+        <div id="parkingCard" class="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">🅿️</span>
+              <div>
+                <h3 class="text-xs font-bold text-[var(--text-main)]">Posizione Sosta / Parcheggio</h3>
+                <p id="parkingTimeLabel" class="text-[10px] text-[var(--text-muted)]">Punto preciso rilevato alla sosta</p>
+              </div>
+            </div>
+            <span id="parkingBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+              Auto Parcheggiata
+            </span>
+          </div>
+
+          <!-- Mappa Integrata: Stile Apple Maps con Pin Pulsante e Coordinate Esatte -->
+          <div class="relative w-full h-40 rounded-xl overflow-hidden border border-[var(--border-color)] bg-zinc-900 shadow-inner group">
+            <!-- Sfondo Mappa / Griglia Stradale Vettoriale ad Alta Definizione -->
+            <svg id="parkingMapSvg" class="w-full h-full object-cover" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="mapGridMain" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#27272a" stroke-width="0.7"/>
+                </pattern>
+              </defs>
+              <!-- Base Map Surface -->
+              <rect width="100%" height="100%" fill="#18181b"/>
+              <rect width="100%" height="100%" fill="url(#mapGridMain)"/>
+              
+              <!-- Parchi / Zone Verdi -->
+              <path d="M 10,10 Q 50,40 30,110 Q 90,80 120,30 Z" fill="#064e3b" opacity="0.4"/>
+              <path d="M 280,90 Q 340,60 380,120 Q 320,160 270,130 Z" fill="#064e3b" opacity="0.35"/>
+              
+              <!-- Isolati Urbani -->
+              <rect x="50" y="60" width="60" height="40" rx="4" fill="#27272a" opacity="0.5"/>
+              <rect x="130" y="20" width="70" height="45" rx="4" fill="#27272a" opacity="0.5"/>
+              <rect x="220" y="30" width="80" height="50" rx="4" fill="#27272a" opacity="0.5"/>
+              <rect x="50" y="120" width="90" height="45" rx="4" fill="#27272a" opacity="0.5"/>
+              <rect x="160" y="95" width="75" height="40" rx="4" fill="#27272a" opacity="0.5"/>
+              <rect x="255" y="100" width="80" height="55" rx="4" fill="#27272a" opacity="0.5"/>
+
+              <!-- Strade Principali (Vie & Viali di Milano) -->
+              <path d="M 0,85 L 400,85" stroke="#3f3f46" stroke-width="12" stroke-linecap="round"/>
+              <path d="M 0,85 L 400,85" stroke="#fbbf24" stroke-width="2" stroke-dasharray="8,6" opacity="0.6"/>
+              <path d="M 195,0 L 195,180" stroke="#3f3f46" stroke-width="10" stroke-linecap="round"/>
+              <path d="M 40,0 L 360,180" stroke="#3f3f46" stroke-width="7" stroke-linecap="round" opacity="0.7"/>
+
+              <!-- Etichette Nomi Strade -->
+              <text id="mapStreetLabel" x="55" y="79" fill="#a1a1aa" font-size="8" font-weight="bold" font-family="system-ui">VIA ALESSANDRO MANZONI</text>
+              <text x="202" y="35" fill="#71717a" font-size="7" font-weight="semibold" font-family="system-ui" transform="rotate(90, 202, 35)">VIA MONTENAPOLEONE</text>
+              <text x="270" y="150" fill="#71717a" font-size="7" font-family="system-ui">PIAZZA DELLA SCALA</text>
+
+              <!-- Radar Ripple Animation centrato sulla macchina -->
+              <circle cx="195" cy="85" r="24" fill="#3b82f6" opacity="0.25">
+                <animate attributeName="r" values="12;35;12" dur="2.4s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.45;0.05;0.45" dur="2.4s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="195" cy="85" r="10" fill="#3b82f6" opacity="0.95"/>
+              <circle cx="195" cy="85" r="4.5" fill="#ffffff"/>
+            </svg>
+
+            <!-- Floating Apple Maps Badge sopra la mappa -->
+            <div class="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-md border border-white/10 flex items-center gap-1.5 shadow">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="mapPinCarLabel" class="text-[9.5px] font-bold text-white font-mono">Auto 1 • Posizione</span>
+            </div>
+
+            <!-- Floating Coordinates Badge -->
+            <div class="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/80 backdrop-blur-md border border-white/10 text-[8.5px] font-mono text-zinc-300">
+              📍 <span id="mapPinCoordsLabel">--° N, --° E</span>
+            </div>
+
+            <!-- Pulsante Apri in Apple Mappe -->
+            <a id="btnExternalMaps" href="https://maps.apple.com/?q=45.4642,9.1900" target="_blank" class="absolute bottom-2 right-2 px-3 py-1 rounded-xl bg-white text-black font-bold text-[10px] flex items-center gap-1 shadow-lg hover:bg-zinc-200 active:scale-95 transition">
+              <span>🗺️</span>
+              <span>Mappe</span>
+            </a>
+          </div>
+
+          <!-- Dettaglio Luogo Sosta & Indicazioni a Piedi -->
+          <div class="p-3 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex items-center justify-between">
+            <div class="space-y-0.5">
+              <div class="text-[9.5px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Indirizzo Sosta Rilevato</div>
+              <div id="parkingAddressLabel" class="text-xs font-bold text-[var(--text-main)]">Posizione non memorizzata</div>
+              <div id="parkingTimestampLabel" class="text-[10px] text-zinc-500 font-mono">--:-- • In attesa di sosta</div>
+            </div>
+            <button onclick="showDirectionsToCar()" class="p-2.5 rounded-xl bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 transition flex flex-col items-center gap-0.5 active:scale-95" title="Indicazioni a piedi verso l'auto">
+              <span class="text-base">🚶</span>
+              <span class="text-[9px] font-bold">Raggiungi</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="tripsListContainer" class="space-y-2">
+          <!-- Popolato via JS -->
+        </div>
+
+        <!-- Signature nel tab viaggi -->
+        <div class="pt-2 pb-2 text-center">
+          <p class="text-[10px] tracking-widest uppercase font-semibold text-[var(--text-muted)] opacity-80">
+            development Gabriele Ponziano
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 4: CALENDARIO ATTIVITÀ MENSILE ==================== -->
+      <section id="tab-calendar" class="space-y-3.5 hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-[var(--text-main)]">Calendario Mensile Attività</h2>
+            <p class="text-[11px] text-[var(--text-muted)]">Completo per tutti i mesi (30/31 giorni) sincronizzato con il sistema</p>
+          </div>
+          <span id="calMonthBadge" class="text-xs px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-500 font-bold border border-amber-500/30">--</span>
+        </div>
+
+        <!-- Selettore Rapido 12 Mesi a Scorrimento -->
+        <div class="space-y-1">
+          <div class="text-[10px] text-[var(--text-muted)] font-medium flex justify-between items-center px-1">
+            <span>Seleziona Mese:</span>
+            <span id="calDaysCountLabel" class="font-mono text-amber-400 font-semibold">31 Giorni</span>
+          </div>
+          <div id="calendarMonthPills" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+            <!-- 12 bottoni per tutti i mesi generati dinamicamente -->
+          </div>
+        </div>
+
+        <!-- Calendario Grid Box -->
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-4 rounded-3xl shadow-sm space-y-3">
+          <!-- Controller Navigazione Mese e Anno -->
+          <div class="flex items-center justify-between pb-2 border-b border-[var(--border-color)]">
+            <div class="flex items-center gap-1.5">
+              <button onclick="changeCalendarMonth(-1)" title="Mese precedente" class="w-7 h-7 rounded-lg bg-[var(--bg-sub)] hover:bg-amber-500/20 text-[var(--text-main)] hover:text-amber-500 flex items-center justify-center font-bold text-xs transition active:scale-95 border border-[var(--border-color)]">
+                ◀
+              </button>
+              <h3 id="calMonthTitle" class="text-xs font-bold text-[var(--text-main)] min-w-[125px] text-center">--</h3>
+              <button onclick="changeCalendarMonth(1)" title="Mese successivo" class="w-7 h-7 rounded-lg bg-[var(--bg-sub)] hover:bg-amber-500/20 text-[var(--text-main)] hover:text-amber-500 flex items-center justify-center font-bold text-xs transition active:scale-95 border border-[var(--border-color)]">
+                ▶
+              </button>
+              <button onclick="goToCalendarToday()" title="Torna a oggi" class="px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 font-bold text-[10px] transition active:scale-95 border border-amber-500/30">
+                Oggi
+              </button>
+            </div>
+            <div class="flex items-center gap-2.5 text-[10.5px] text-[var(--text-muted)]">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> Pieno</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Viaggio</span>
+            </div>
+          </div>
+
+          <!-- Griglia Dinamica Giorni Mese -->
+          <div id="calendarDaysGrid" class="grid grid-cols-7 gap-1.5 text-center text-xs">
+            <!-- Popolato dinamicamente da renderCalendar() con giorni completi 1..30/31 e giorni di raccordo -->
+          </div>
+
+          <!-- Riepilogo Statistiche Mensili del Mese Selezionato -->
+          <div id="calendarMonthStatsBox" class="grid grid-cols-4 gap-1.5 text-center text-xs pt-1 border-t border-[var(--border-color)]">
+            <!-- Popolato dinamicamente da renderCalendarMonthStats() -->
+          </div>
+
+          <!-- Riquadro Dettaglio Giorno Selezionato -->
+          <div id="calendarDetailBox" class="p-3.5 rounded-2xl bg-[var(--bg-sub)] text-xs text-[var(--text-sub)] border border-[var(--border-color)] leading-relaxed shadow-inner">
+            <!-- Popolato dinamicamente da showCalendarDetail() -->
+          </div>
+        </div>
+
+        <!-- Signature Credit Footer -->
+        <div class="pt-2 pb-2 text-center">
+          <p class="text-[10px] tracking-widest uppercase font-semibold text-[var(--text-muted)] opacity-80">
+            development Gabriele Ponziano
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 5: ASSICURAZIONI AUTO ==================== -->
+      <section id="tab-insurance" class="space-y-3.5 hidden">
+        <div>
+          <h2 class="text-sm font-bold text-[var(--text-main)]">Assicurazioni & Polizze Auto</h2>
+          <p class="text-[11px] text-[var(--text-muted)]">Monitoraggio scadenze con avviso a 14 giorni e polizze modificabili</p>
+        </div>
+
+        <!-- Lista dinamica e modificabile delle polizze per ciascuna auto -->
+        <div id="insuranceCardsList" class="space-y-3">
+          <!-- Popolato dinamicamente via JS da renderInsurance() -->
+        </div>
+
+        <!-- Signature nel tab assicurazione -->
+        <div class="pt-2 pb-2 text-center">
+          <p class="text-[10px] tracking-widest uppercase font-semibold text-[var(--text-muted)] opacity-80">
+            development Gabriele Ponziano
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 5: REPORT & PDF AVANZATO ==================== -->
+      <section id="tab-stats" class="space-y-4 hidden">
+        <div>
+          <h2 class="text-sm font-bold text-[var(--text-main)]">Report PDF Ufficiale & Resoconto</h2>
+          <p class="text-[11px] text-[var(--text-muted)]">Genera il resoconto con grafico spese carburante e tabella tratte</p>
+        </div>
+
+        <!-- Box Generazione PDF -->
+        <div class="p-4 rounded-2xl bg-gradient-to-br from-amber-500/15 via-[var(--bg-card)] to-[var(--bg-card)] border border-amber-500/30 space-y-3">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">📄</span>
+            <div>
+              <div class="text-xs font-bold text-[var(--text-main)]">Documento Completo con Grafico & Tratte</div>
+              <div class="text-[11px] text-[var(--text-muted)]">Raccoglie grafico comparativo, tratte 24h e stato polizze</div>
+            </div>
+          </div>
+
+          <button onclick="openModal('modalPdfReport')" class="w-full py-3 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Genera & Visualizza PDF Ufficiale
+          </button>
+        </div>
+
+        <!-- NUOVA SEZIONE: Consumo Carburante in Litri (Giornaliero & Mensile) -->
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-4 rounded-2xl shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-xl bg-cyan-500/15 text-cyan-500 flex items-center justify-center font-bold text-xs">💧</div>
+              <div>
+                <h3 class="text-xs font-bold text-[var(--text-main)]">Consumo Carburante in Litri</h3>
+                <p class="text-[10px] text-[var(--text-muted)]">Monitoraggio volumetrico 24h & mensile</p>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-bold border border-cyan-500/30">Litri (L)</span>
+          </div>
+
+          <!-- Griglia Metriche Litri Giornalieri e Mensili -->
+          <div class="grid grid-cols-2 gap-2.5 pt-0.5">
+            <!-- Consumo Giornaliero -->
+            <div class="p-3 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-1">
+              <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+                <span>Consumo Giornaliero</span>
+                <span class="text-cyan-400">📅</span>
+              </div>
+              <div id="statLitersDaily" class="text-xl font-black text-cyan-400">0.0 L/gg</div>
+              <div class="text-[10px] text-[var(--text-muted)] flex justify-between">
+                <span>Ultime 24h:</span>
+                <span id="statLiters24h" class="font-bold text-[var(--text-main)] font-mono">0.0 L</span>
+              </div>
+            </div>
+
+            <!-- Consumo Mensile -->
+            <div class="p-3 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-1">
+              <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+                <span>Consumo Mensile</span>
+                <span class="text-cyan-400">🗓️</span>
+              </div>
+              <div id="statLitersMonthly" class="text-xl font-black text-cyan-400">0.0 L</div>
+              <div class="text-[10px] text-[var(--text-muted)] flex justify-between">
+                <span>Tot. Garage:</span>
+                <span id="statTotalGarageLiters" class="font-bold text-[var(--text-main)] font-mono">0.0 L</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ripartizione volumetrica per auto del garage -->
+          <div class="space-y-1.5 pt-1 text-xs">
+            <div class="flex justify-between text-[var(--text-muted)]">
+              <span>Ripartizione Litri Mese</span>
+              <span class="font-mono font-bold text-[var(--text-main)]">Mese Corrente</span>
+            </div>
+            <div class="w-full h-2.5 rounded-full bg-zinc-800 overflow-hidden flex">
+              <div class="bg-amber-500 h-full" style="width: 33.3%" title="Auto 1"></div>
+              <div class="bg-blue-500 h-full" style="width: 33.3%" title="Auto 2"></div>
+              <div class="bg-emerald-500 h-full" style="width: 33.4%" title="Auto 3"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-[var(--text-muted)] pt-0.5">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> <span id="distLabelCar0">Auto 1</span>: <b id="distValCar0">0.0 L</b></span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> <span id="distLabelCar1">Auto 2</span>: <b id="distValCar1">0.0 L</b></span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <span id="distLabelCar2">Auto 3</span>: <b id="distValCar2">0.0 L</b></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Box Anteprima Contenuti Inclusi nel PDF -->
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-4 rounded-2xl shadow-sm space-y-2.5 text-xs">
+          <div class="font-bold text-[var(--text-main)] flex items-center justify-between">
+            <span>Cosa include il tuo PDF:</span>
+            <span class="text-[10px] text-amber-500 font-semibold">Tutto in 1 Foglio A4</span>
+          </div>
+          <div class="space-y-1.5 text-[11px] text-[var(--text-sub)]">
+            <div class="flex items-center gap-2"><span>📈</span> <span><b>Grafico dell'andamento carburante</b> delle 3 auto.</span></div>
+            <div class="flex items-center gap-2"><span>📋</span> <span><b>Tabella dettagliata dei tratti:</b> km, costo, durata, auto usata.</span></div>
+            <div class="flex items-center gap-2"><span>⏰</span> <span><b>Resoconto delle ultime 24 ore</b> (pronto per invio ore 8:00).</span></div>
+            <div class="flex items-center gap-2"><span>🛡️</span> <span><b>Stato scadenze assicurative</b> e chilometraggio odometri.</span></div>
+          </div>
+        </div>
+
+        <!-- Auto Configurate Modificabili -->
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-4 rounded-2xl shadow-sm space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-[var(--text-main)]">Le Tue 3 Auto</span>
+            <span class="text-[10px] text-[var(--text-muted)]">Tocca per modificare</span>
+          </div>
+          <div class="space-y-1.5 text-xs">
+            <div onclick="openModalEditCar(0)" class="p-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex justify-between items-center cursor-pointer hover:border-amber-500/50 transition">
+              <div>
+                <span id="listCarName0" class="font-bold text-[var(--text-main)]">Auto 1</span>
+                <span id="listCarFuel0" class="text-[10px] text-[var(--text-muted)] block">Gasolio</span>
+              </div>
+              <div class="text-right">
+                <span id="listCarOdo0" class="text-[var(--text-sub)] font-mono">0 km</span>
+                <span class="text-[10px] text-amber-500 block">Modifica ✏️</span>
+              </div>
+            </div>
+            <div onclick="openModalEditCar(1)" class="p-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex justify-between items-center cursor-pointer hover:border-amber-500/50 transition">
+              <div>
+                <span id="listCarName1" class="font-bold text-[var(--text-main)]">Auto 2</span>
+                <span id="listCarFuel1" class="text-[10px] text-[var(--text-muted)] block">Benzina</span>
+              </div>
+              <div class="text-right">
+                <span id="listCarOdo1" class="text-[var(--text-sub)] font-mono">0 km</span>
+                <span class="text-[10px] text-amber-500 block">Modifica ✏️</span>
+              </div>
+            </div>
+            <div onclick="openModalEditCar(2)" class="p-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex justify-between items-center cursor-pointer hover:border-amber-500/50 transition">
+              <div>
+                <span id="listCarName2" class="font-bold text-[var(--text-main)]">Auto 3</span>
+                <span id="listCarFuel2" class="text-[10px] text-[var(--text-muted)] block">Ibrida</span>
+              </div>
+              <div class="text-right">
+                <span id="listCarOdo2" class="text-[var(--text-sub)] font-mono">0 km</span>
+                <span class="text-[10px] text-amber-500 block">Modifica ✏️</span>
+              </div>
+            </div>
+          </div>
+          <div class="pt-2 border-t border-[var(--border-color)] flex justify-between items-center">
+            <span class="text-[10px] text-[var(--text-muted)]">Gestione Dati:</span>
+            <button type="button" onclick="resetAllData()" class="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold text-[10px] border border-red-500/20 transition active:scale-95">
+              🗑️ Ripristina Dati Fabbrica
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-2 pb-2 text-center">
+          <p class="text-[10px] tracking-widest uppercase font-semibold text-[var(--text-muted)] opacity-80">
+            development Gabriele Ponziano
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <!-- 6-Tab iOS Native Frosted Glass Fixed Bottom Dock -->
+    <nav id="appNav" class="bg-[var(--tab-bg)] backdrop-blur-2xl border-t border-[var(--border-color)] px-1.5 pt-2 fixed bottom-0 left-0 right-0 max-w-lg mx-auto z-40 flex items-center justify-around shadow-2xl transition-colors duration-300">
+      <button onclick="switchTab('dashboard')" id="nav-dashboard" class="flex flex-col items-center justify-center gap-1 text-amber-500 py-1 transition flex-1 active:scale-95">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span class="text-[10px] font-semibold tracking-tight">Home</span>
+      </button>
+
+      <button onclick="switchTab('refuels')" id="nav-refuels" class="flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] py-1 transition flex-1 active:scale-95">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/></svg>
+        <span class="text-[10px] font-semibold tracking-tight">Pieni</span>
+      </button>
+
+      <button onclick="switchTab('trips')" id="nav-trips" class="flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] py-1 transition flex-1 active:scale-95">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        <span class="text-[10px] font-semibold tracking-tight">Viaggi</span>
+      </button>
+
+      <button onclick="switchTab('calendar')" id="nav-calendar" class="flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] py-1 transition flex-1 active:scale-95">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span class="text-[10px] font-semibold tracking-tight">Calendario</span>
+      </button>
+
+      <button onclick="switchTab('insurance')" id="nav-insurance" class="flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] py-1 transition relative flex-1 active:scale-95">
+        <span class="absolute top-0.5 right-3 w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <span class="text-[10px] font-semibold tracking-tight">Polizze</span>
+      </button>
+
+      <button onclick="switchTab('stats')" id="nav-stats" class="flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-main)] py-1 transition flex-1 active:scale-95">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span class="text-[10px] font-semibold tracking-tight">PDF</span>
+      </button>
+    </nav>
+  </main>
+
+  <!-- ==================== MODAL: MODIFICA VEICOLO ==================== -->
+  <div id="modalEditCar" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl text-xs">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-base">🚗</span>
+          <h3 class="font-bold text-xs text-[var(--text-main)]">Modifica Veicolo</h3>
+        </div>
+        <button onclick="closeModal('modalEditCar')" class="text-[var(--text-muted)] hover:text-[var(--text-main)]">✕</button>
+      </div>
+
+      <div class="space-y-2.5">
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Nome Veicolo</label>
+          <input type="text" id="editCarNameInput" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-bold focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Tipo Carburante</label>
+          <select id="editCarFuelSelect" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500">
+            <option value="Gasolio">Gasolio (Diesel)</option>
+            <option value="Benzina">Benzina</option>
+            <option value="Ibrida">Ibrida</option>
+            <option value="GPL">GPL</option>
+            <option value="Metano">Metano</option>
+            <option value="Elettrico">Elettrico</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Contachilometri Attuale (km)</label>
+          <input type="number" id="editCarOdoInput" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-mono font-bold focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Dispositivo Bluetooth Associato</label>
+          <input type="text" id="editCarBtInput" placeholder="es. Bluetooth Auto" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div class="pt-1">
+          <button type="button" onclick="resetCarData(editingCarIndex)" class="w-full py-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold border border-red-500/20 transition active:scale-95">
+            🗑️ Azzera Dati e Chilometri di Questa Auto
+          </button>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button onclick="closeModal('modalEditCar')" class="flex-1 py-2.5 rounded-xl bg-zinc-700/50 text-[var(--text-sub)] text-xs font-semibold">Annulla</button>
+        <button onclick="saveCarEdit()" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold">Salva Modifiche</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: PDF UFFICIALE AVANZATO ==================== -->
+  <div id="modalPdfReport" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-zinc-900 border border-zinc-750 rounded-3xl max-w-sm w-full p-4 space-y-3.5 shadow-2xl text-xs max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📄</span>
+          <div>
+            <h3 class="font-bold text-white text-xs">Report PDF Ufficiale Completo</h3>
+            <p class="text-[10px] text-zinc-400">Generato: 14 Ottobre 2026, ore 08:00</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalPdfReport')" class="text-zinc-400 hover:text-white p-1">✕</button>
+      </div>
+
+      <!-- FOGLIO A4 BIANCO STAMPABILE CON TUTTI I DATI RICHIESTI -->
+      <div class="p-3.5 rounded-2xl bg-white text-zinc-900 space-y-3 text-[11px] shadow-lg border border-zinc-200">
+        <!-- Intestazione Documento -->
+        <div class="flex justify-between items-start border-b border-zinc-300 pb-2">
+          <div>
+            <div class="font-black text-xs text-black">RESOCONTO DETTAGLIATO CARBURANTE & TRATTE</div>
+            <div class="text-[9px] text-zinc-600 font-medium">Proprietario: Gabriele Ponziano • Uso Personale</div>
+          </div>
+          <div class="text-[9px] text-right text-zinc-600 font-mono">
+            Rif. 24h & Mensile
+          </div>
+        </div>
+
+        <!-- Box 1: Grafico Andamento Carburante Ripodotto nel PDF -->
+        <div class="space-y-1">
+          <div class="font-bold text-[10px] text-zinc-800 flex justify-between items-center">
+            <span>ANDAMENTO SPESE CARBURANTE (ULTIMI 6 MESI):</span>
+            <span class="text-[9px] text-zinc-500 font-normal">Tutte le 3 Auto</span>
+          </div>
+          <!-- Mini Grafico SVG nel PDF -->
+          <div class="bg-zinc-50 p-2 rounded-xl border border-zinc-200 flex flex-col items-center">
+            <svg class="w-full h-16" viewBox="0 0 300 70">
+              <!-- Grid lines -->
+              <line x1="0" y1="55" x2="300" y2="55" stroke="#e4e4e7" stroke-width="1"/>
+              <line x1="0" y1="25" x2="300" y2="25" stroke="#e4e4e7" stroke-width="1"/>
+              
+              <!-- Linea Auto 1 (Ambra) -->
+              <polyline fill="none" stroke="#f59e0b" stroke-width="2.5" points="20,48 70,38 120,45 170,30 220,35 280,20"/>
+              <!-- Linea Auto 2 (Blu) -->
+              <polyline fill="none" stroke="#3b82f6" stroke-width="2" points="20,55 70,52 120,50 170,48 220,46 280,44"/>
+              <!-- Linea Auto 3 (Verde) -->
+              <polyline fill="none" stroke="#10b981" stroke-width="2" points="20,58 70,56 120,54 170,52 220,50 280,48"/>
+
+              <!-- Mesi Label -->
+              <text x="20" y="66" font-size="8" fill="#71717a">Mag</text>
+              <text x="70" y="66" font-size="8" fill="#71717a">Giu</text>
+              <text x="120" y="66" font-size="8" fill="#71717a">Lug</text>
+              <text x="170" y="66" font-size="8" fill="#71717a">Ago</text>
+              <text x="220" y="66" font-size="8" fill="#71717a">Set</text>
+              <text x="280" y="66" font-size="8" fill="#71717a">Ott</text>
+            </svg>
+            <div class="flex justify-around w-full text-[8px] text-zinc-600 mt-1">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> <span id="pdfLegendCar0">Auto 1</span> (<span id="pdfValCar0">€ 0,0</span>)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> <span id="pdfLegendCar1">Auto 2</span> (<span id="pdfValCar1">€ 0,0</span>)</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <span id="pdfLegendCar2">Auto 3</span> (<span id="pdfValCar2">€ 0,0</span>)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Box 2: Tabella Dettagliata Tratte, Kilometri, Costi e Auto Usata -->
+        <div class="space-y-1">
+          <div class="font-bold text-[10px] text-zinc-800">TABELLA CHILOMETRI & TRATTE (CON RESOCONTO ULTIME 24H):</div>
+          <div class="overflow-hidden border border-zinc-200 rounded-xl">
+            <table class="w-full text-[9px] text-left">
+              <thead class="bg-zinc-100 text-zinc-700 font-bold border-b border-zinc-200">
+                <tr>
+                  <th class="p-1.5">Data / Ora</th>
+                  <th class="p-1.5">Auto Usata</th>
+                  <th class="p-1.5">Tratta Percorsa</th>
+                  <th class="p-1.5 text-right">Km</th>
+                  <th class="p-1.5 text-right">Costo Gasolio</th>
+                </tr>
+              </thead>
+              <tbody id="pdfTripsTableBody" class="divide-y divide-zinc-200 text-zinc-800">
+                <tr>
+                  <td colspan="5" class="p-3 text-center text-zinc-500 italic">Nessun viaggio registrato al momento. Registra un viaggio per vederlo nel PDF.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Box: Consumo Carburante Effettivo in Litri (Giornaliero & Mensile) -->
+        <div class="space-y-1 border border-zinc-200 rounded-xl p-2.5 bg-zinc-50">
+          <div class="font-bold text-[10px] text-zinc-800 flex justify-between items-center">
+            <span>RESOCONTO LITRI CONSUMATI (GIORNALIERO & MENSILE):</span>
+            <span class="text-[9px] text-zinc-500 font-mono">Ottobre 2026</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center text-[9px]">
+            <div class="bg-white p-2 rounded-lg border border-zinc-200 shadow-sm">
+              <div class="text-zinc-500 text-[8px] uppercase font-semibold">Ultime 24 Ore</div>
+              <div id="pdfLiters24h" class="font-black text-black text-sm my-0.5">0.0 L</div>
+              <div class="text-[7.5px] text-zinc-500">Carburante consumato</div>
+            </div>
+            <div class="bg-white p-2 rounded-lg border border-zinc-200 shadow-sm">
+              <div class="text-zinc-500 text-[8px] uppercase font-semibold">Media Giornaliera</div>
+              <div id="pdfLitersDaily" class="font-black text-black text-sm my-0.5">0.0 L / gg</div>
+              <div class="text-[7.5px] text-zinc-500">Media 30 giorni garage</div>
+            </div>
+            <div class="bg-white p-2 rounded-lg border border-zinc-200 shadow-sm">
+              <div class="text-zinc-500 text-[8px] uppercase font-semibold">Totale Mese</div>
+              <div id="pdfLitersMonthly" class="font-black text-black text-sm my-0.5">0.0 L</div>
+              <div class="text-[7.5px] text-zinc-500">Totale litri garage</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Box 3: Stato Assicurativo -->
+        <div class="p-2 rounded-xl bg-zinc-50 border border-zinc-200 text-[9px] flex justify-between items-center">
+          <span id="pdfInsuranceStatusText"><b>Stato Polizze:</b> Tutte le coperture del garage sono regolari o da configurare.</span>
+          <span class="text-emerald-600 font-bold">Verificato</span>
+        </div>
+      </div>
+
+      <!-- Azioni -->
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeModal('modalPdfReport')" class="flex-1 py-2 rounded-xl bg-zinc-800 text-zinc-300 text-xs">Chiudi</button>
+        <button onclick="window.print()" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center justify-center gap-1.5 shadow">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          Stampa / Salva PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Rifornimento -->
+  <div id="modalRefuel" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-xs w-full p-4 space-y-3 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-xs">Nuovo Rifornimento</h3>
+        <button onclick="closeModal('modalRefuel')" class="text-[var(--text-muted)] hover:text-[var(--text-main)]">✕</button>
+      </div>
+
+      <div class="space-y-1.5">
+        <button type="button" onclick="openCameraScanner()" class="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Inquadra Scontrino con Fotocamera
+        </button>
+        <input type="file" id="cameraReceiptInput" accept="image/*" capture="environment" class="hidden" onchange="handleReceiptFileInput(event)">
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Km Odometro Attuale</label>
+          <input type="number" id="refuelInputKm" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono font-bold">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Litri</label>
+            <input type="number" step="0.01" id="refuelInputLiters" oninput="calcRefuelModalTotal()" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono">
+          </div>
+          <div>
+            <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Prezzo (€/L)</label>
+            <input type="number" step="0.001" id="refuelInputPricePerL" oninput="calcRefuelModalTotal()" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Totale Pagato (€)</label>
+          <input type="number" step="0.01" id="refuelInputTotal" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-amber-500 font-bold font-mono">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeModal('modalRefuel')" class="flex-1 py-2 rounded-xl bg-zinc-700/40 text-[var(--text-sub)] text-xs">Annulla</button>
+        <button onclick="saveRefuelFromModal()" class="flex-1 py-2 rounded-xl bg-amber-500 text-black text-xs font-bold">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: FOTOCAMERA SCANNER SCONTRINO ==================== -->
+  <div id="modalCameraScan" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-sm w-full p-4 space-y-3 shadow-2xl text-xs overflow-hidden">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-bold text-xs">
+            📷
+          </div>
+          <div>
+            <h3 class="font-bold text-xs text-[var(--text-main)]">Fotocamera Scontrino</h3>
+            <p class="text-[10px] text-[var(--text-muted)]">Inquadra lo scontrino del carburante</p>
+          </div>
+        </div>
+        <button onclick="closeCameraScanner()" class="text-[var(--text-muted)] hover:text-[var(--text-main)] text-sm p-1">✕</button>
+      </div>
+
+      <!-- Viewfinder / Camera Box -->
+      <div class="relative w-full h-64 rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-zinc-700">
+        <!-- Video Feed live -->
+        <video id="cameraVideoFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
+
+        <!-- Canvas per acquisizione snapshot -->
+        <canvas id="cameraCanvas" class="hidden"></canvas>
+
+        <!-- Preview Immagine scattata -->
+        <img id="cameraCapturedImg" class="hidden absolute inset-0 w-full h-full object-cover" alt="Scontrino acquisito">
+
+        <!-- Mirino ottico con angoli ambra -->
+        <div id="cameraFrameOverlay" class="absolute inset-4 border-2 border-dashed border-amber-400/80 rounded-2xl flex flex-col justify-between p-3 pointer-events-none shadow-2xl">
+          <div class="flex justify-between">
+            <span class="w-4 h-4 border-t-2 border-l-2 border-amber-400"></span>
+            <span class="w-4 h-4 border-t-2 border-r-2 border-amber-400"></span>
+          </div>
+          <div class="text-center bg-black/70 backdrop-blur-sm rounded-xl py-1 px-2.5 mx-auto">
+            <span class="text-[10px] font-bold text-amber-300">Inquadra Totale € e Litri nello scontrino</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="w-4 h-4 border-b-2 border-l-2 border-amber-400"></span>
+            <span class="w-4 h-4 border-b-2 border-r-2 border-amber-400"></span>
+          </div>
+        </div>
+
+        <!-- Scanning Beam Animation -->
+        <div id="cameraScanBeam" class="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent pointer-events-none animate-bounce opacity-80"></div>
+      </div>
+
+      <!-- Stato Rilevamento OCR & Risultato -->
+      <div id="cameraStatusBox" class="p-3 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-1.5">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-[var(--text-muted)]">Stato Scanner:</span>
+          <span id="cameraSensorLabel" class="font-bold text-emerald-400">Sensore Ottico Attivo</span>
+        </div>
+        <div id="cameraResultPills" class="hidden flex gap-1.5 pt-1 text-[10px]">
+          <span class="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 font-mono font-bold" id="camPillTot">€ 0,00</span>
+          <span class="px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-400 font-mono font-bold" id="camPillLit">0.00 L</span>
+          <span class="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold" id="camPillPrice">0.000 €/L</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-col gap-2 pt-1">
+        <button id="btnSnapAndAnalyze" onclick="captureAndAnalyzeFrame()" class="w-full py-3 px-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition">
+          <span>⚡</span>
+          <span>Scatta & Analizza Scontrino</span>
+        </button>
+
+        <div class="flex gap-2">
+          <button onclick="triggerNativeCameraInput()" class="flex-1 py-2 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] text-[11px] font-semibold flex items-center justify-center gap-1.5 hover:bg-zinc-700/30 transition active:scale-95">
+            <span>📱</span>
+            <span>Fotocamera Nativa iOS</span>
+          </button>
+          <button onclick="closeCameraScanner()" class="py-2 px-3 rounded-xl bg-zinc-700/40 text-[var(--text-sub)] text-[11px] font-semibold hover:bg-zinc-700/60 transition">
+            Chiudi
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Viaggio -->
+  <div id="modalTrip" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-xs w-full p-4 space-y-3 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-xs">Nuovo Viaggio (Personale)</h3>
+        <button onclick="closeModal('modalTrip')" class="text-[var(--text-muted)] hover:text-[var(--text-main)]">✕</button>
+      </div>
+
+      <!-- Scorciatoia Rapida Gemini AI Voice -->
+      <button type="button" onclick="closeModal('modalTrip'); openModalGeminiVoice();" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-purple-500/15 to-indigo-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 border border-purple-500/30 text-purple-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95">
+        <span>✨🎙️</span> <span>Detta Percorso con Gemini AI</span>
+      </button>
+
+      <div class="space-y-2 text-xs">
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Destinazione / Tratta</label>
+          <input type="text" id="tripInputTitle" placeholder="es. Gita Lago di Como / Spesa" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Distanza (km)</label>
+            <input type="number" step="0.1" id="tripInputKm" value="35" oninput="updateTripModalEstimates()" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono font-bold">
+          </div>
+          <div>
+            <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Durata (min)</label>
+            <input type="number" id="tripInputDuration" value="30" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono">
+          </div>
+        </div>
+
+        <div class="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--input-border)] flex justify-between items-center text-[11px]">
+          <span class="text-[var(--text-muted)]">Costo Carburante Stimato:</span>
+          <span id="tripModalEstFuel" class="font-bold text-amber-500 font-mono">€ 3,50</span>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeModal('modalTrip')" class="flex-1 py-2 rounded-xl bg-zinc-700/40 text-[var(--text-sub)] text-xs">Annulla</button>
+        <button onclick="saveTripFromModal()" class="flex-1 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold">Salva</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ASSISTENTE VOCALE GEMINI AI ==================== -->
+  <div id="modalGeminiVoice" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl text-xs max-h-[92vh] overflow-y-auto">
+      
+      <!-- Intestazione Modal -->
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-purple-500 to-blue-500 text-white flex items-center justify-center text-sm shadow">
+            ✨
+          </div>
+          <div>
+            <h3 class="font-bold text-xs text-[var(--text-main)]">Gemini Voice Assistant</h3>
+            <p class="text-[9.5px] text-[var(--text-muted)]">Estrae percorso, tempo e km da ogni conversazione</p>
+          </div>
+        </div>
+        <button onclick="closeModalGeminiVoice()" class="text-[var(--text-muted)] hover:text-[var(--text-main)] text-sm p-1">✕</button>
+      </div>
+
+      <!-- Sfera AI Interattiva Animata -->
+      <div class="flex flex-col items-center justify-center py-2 space-y-3">
+        <div class="relative flex items-center justify-center w-24 h-24">
+          <!-- Onde pulsanti quando in ascolto / elaborazione -->
+          <div id="geminiPulseRing1" class="absolute inset-0 rounded-full bg-purple-500/25 animate-ping opacity-0 transition-opacity"></div>
+          <div id="geminiPulseRing2" class="absolute -inset-2 rounded-full bg-blue-500/20 animate-pulse opacity-0 transition-opacity"></div>
+          <!-- Sfera Centrale -->
+          <button id="btnGeminiMicRecord" onclick="toggleGeminiSpeechRecognition()" class="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-purple-600 via-indigo-500 to-blue-500 text-white text-3xl flex items-center justify-center shadow-xl shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all duration-300">
+            <span id="geminiMicIcon">🎙️</span>
+          </button>
+        </div>
+
+        <div class="text-center space-y-0.5">
+          <div id="geminiStatusLabel" class="font-bold text-xs text-[var(--text-main)]">Tocca il microfono per parlare</div>
+          <p id="geminiStatusSub" class="text-[10px] text-[var(--text-muted)]">es. "Oggi ho fatto 45 km da Milano a Como in 40 minuti"</p>
+        </div>
+      </div>
+
+      <!-- Trascrizione Conversazione / Input Testo -->
+      <div class="space-y-1.5">
+        <div class="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
+          <span>Conversazione / Frase:</span>
+          <button type="button" onclick="clearGeminiInput()" class="hover:text-amber-500">Cancella</button>
+        </div>
+        <div class="relative">
+          <textarea id="geminiConversationInput" rows="3" placeholder="Parla col microfono o scrivi qui la tua frase sul viaggio..." class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-500 resize-none font-medium leading-relaxed"></textarea>
+        </div>
+        <button id="btnGeminiAnalyze" onclick="processGeminiConversation()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/20 transition active:scale-95">
+          <span>⚡ Estrai Parametri & Salva con Gemini</span>
+        </button>
+      </div>
+
+      <!-- Riquadro Risultati Estratti (3 Parametri) -->
+      <div id="geminiResultCard" class="hidden space-y-2.5 p-3 rounded-2xl bg-[var(--bg-sub)] border border-purple-500/30 shadow-inner">
+        <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-1.5">
+          <span class="font-bold text-[10.5px] text-purple-400 flex items-center gap-1">
+            <span>✓</span> Dati Estratti con Successo
+          </span>
+          <span class="text-[9px] text-[var(--text-muted)]" id="geminiActiveCarLabel">Auto 1</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1.5 text-center">
+          <div class="p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <div class="text-[9px] text-[var(--text-muted)] font-medium">📍 Percorso</div>
+            <div id="geminiExtractedRoute" class="text-xs font-bold text-[var(--text-main)] truncate mt-0.5">--</div>
+          </div>
+          <div class="p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <div class="text-[9px] text-[var(--text-muted)] font-medium">⏱️ Tempo</div>
+            <div id="geminiExtractedTime" class="text-xs font-bold text-cyan-400 font-mono mt-0.5">-- min</div>
+          </div>
+          <div class="p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]">
+            <div class="text-[9px] text-[var(--text-muted)] font-medium">🛣️ Distanza</div>
+            <div id="geminiExtractedKm" class="text-xs font-bold text-amber-500 font-mono mt-0.5">-- km</div>
+          </div>
+        </div>
+
+        <!-- Riga Data & Ora di Registrazione -->
+        <div class="px-2.5 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-between text-[10px]">
+          <span class="text-[var(--text-muted)] flex items-center gap-1"><span>📅</span> Data & Ora Viaggio:</span>
+          <span id="geminiExtractedDateTime" class="font-bold text-amber-400 font-mono">--</span>
+        </div>
+
+        <!-- Conferma Vocale Box -->
+        <div class="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between text-[11px]">
+          <div class="space-y-0.5 flex-1 pr-2">
+            <div class="text-[9px] text-purple-300 font-bold uppercase tracking-wider">Conferma Vocale:</div>
+            <div id="geminiVoiceFeedbackText" class="text-[10px] text-zinc-300 italic">"Dati aggiornati con successo nel database."</div>
+          </div>
+          <button onclick="replayVoiceConfirmation()" title="Riascolta conferma vocale" class="p-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 active:scale-95 transition">
+            🔊
+          </button>
+        </div>
+      </div>
+
+      <!-- Configurazione Gemini API Key (Espandibile) -->
+      <div class="pt-1 border-t border-[var(--border-color)]">
+        <details class="text-[10px] text-[var(--text-muted)] group">
+          <summary class="cursor-pointer hover:text-[var(--text-main)] flex items-center justify-between py-1">
+            <span class="flex items-center gap-1 font-semibold">⚙️ Impostazioni Chiave API Gemini</span>
+            <span class="group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div class="pt-2 space-y-1.5">
+            <p class="text-[9.5px] leading-relaxed">
+              Inserisci la tua chiave gratuita <b>Google Gemini API</b> (Google AI Studio) per abilitare il modello <code>gemini-1.5-flash</code>. In assenza di chiave, l'assistente utilizzerà l'elaborazione locale automatica.
+            </p>
+            <div class="flex gap-1.5">
+              <input type="password" id="inputGeminiApiKey" placeholder="Incolla qui la tua API Key..." class="flex-1 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-purple-500">
+              <button type="button" onclick="saveGeminiApiKeyUI()" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs active:scale-95 transition">
+                Salva
+              </button>
+            </div>
+            <div id="geminiKeyStatus" class="text-[9px] text-emerald-400 hidden">✓ Chiave API salvata localmente</div>
+          </div>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal Guida Comandi Rapidi iOS -->
+  <div id="modalIosShortcuts" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-zinc-900 border border-zinc-750 rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl text-xs text-white max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">⚡</span>
+          <div>
+            <h3 class="font-bold text-xs text-white">Automazione Bluetooth su iPhone</h3>
+            <p class="text-[10px] text-zinc-400">Come attivarlo nativamente con Comandi Rapidi</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalIosShortcuts')" class="text-zinc-400 hover:text-white p-1">✕</button>
+      </div>
+
+      <div class="space-y-2.5 text-[11px] text-zinc-300">
+        <p>Grazie all'app nativa <b>Comandi Rapidi (Shortcuts)</b> di iOS, puoi far avviare e fermare l'app in totale autonomia anche con l'iPhone bloccato in tasca:</p>
+
+        <div class="p-2.5 rounded-xl bg-zinc-800/80 border border-zinc-700 space-y-1.5">
+          <div class="font-bold text-amber-400 flex items-center gap-1.5">
+            <span>1️⃣</span> <span>Automazione Avvio Viaggio (Salita in Auto)</span>
+          </div>
+          <p class="text-[10px] text-zinc-400">
+            Apri <i>Comandi Rapidi</i> ➔ scheda <b>Automazione</b> ➔ <b>Crea automazione personale</b> ➔ Seleziona <b>Bluetooth</b> ➔ Dispositivo: <code>VW BT 4821</code> ➔ <i>Quando si connette</i> ➔ Azione: <b>Apri App Gasolio</b>.
+          </p>
+        </div>
+
+        <div class="p-2.5 rounded-xl bg-zinc-800/80 border border-zinc-700 space-y-1.5">
+          <div class="font-bold text-blue-400 flex items-center gap-1.5">
+            <span>2️⃣</span> <span>Automazione Sosta & Parcheggio (Discesa dall'Auto)</span>
+          </div>
+          <p class="text-[10px] text-zinc-400">
+            Crea una seconda automazione: <b>Bluetooth</b> ➔ Dispositivo: la tua auto ➔ <i>Quando si disconnette</i> ➔ Azione: <b>Salva posizione sosta & Termina viaggio</b>.
+          </p>
+        </div>
+
+        <div class="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400">
+          💡 <b>100% Senza Pensieri:</b> Non devi mai aprire l'app a mano. Salendo in auto la registrazione parte in background; spegnendo il motore la posizione del parcheggio viene salvata per non dimenticare mai dove hai lasciato l'auto.
+        </div>
+      </div>
+
+      <button onclick="closeModal('modalIosShortcuts')" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">
+        Ho Capito
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal Modifica Assicurazione -->
+  <div id="modalEditInsurance" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-xs w-full p-4 space-y-3.5 shadow-2xl text-xs">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
+        <div>
+          <h3 class="font-bold text-xs" id="insModalCarTitle">Modifica Polizza Assicurativa</h3>
+          <p class="text-[10px] text-[var(--text-muted)]">Aggiorna scadenza, compagnia e costo</p>
+        </div>
+        <button onclick="closeModal('modalEditInsurance')" class="text-[var(--text-muted)] hover:text-[var(--text-main)]">✕</button>
+      </div>
+
+      <input type="hidden" id="editInsCarIndex" value="0">
+
+      <div class="space-y-2.5">
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Compagnia Assicurativa</label>
+          <input type="text" id="insCompanyInput" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-bold focus:outline-none focus:border-amber-500">
+        </div>
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Tipo Copertura / Garanzie</label>
+          <input type="text" id="insTypeInput" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500">
+        </div>
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Data Scadenza Polizza</label>
+          <input type="date" id="insExpiryInput" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-mono focus:outline-none focus:border-amber-500">
+        </div>
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Costo Annuale (€)</label>
+          <input type="number" id="insCostInput" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-mono font-bold focus:outline-none focus:border-amber-500">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeModal('modalEditInsurance')" class="flex-1 py-2 rounded-xl bg-zinc-700/40 text-[var(--text-sub)] text-xs">Annulla</button>
+        <button onclick="saveInsuranceEdit()" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow">Salva Polizza</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
