@@ -242,10 +242,10 @@
             <div class="text-[9px] text-emerald-500 font-semibold">Tutti i viaggi</div>
           </div>
 
-          <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-2xl shadow-sm space-y-0.5">
+          <div onclick="openModalEditCar(activeCarIndex)" class="bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-emerald-500/50 p-3 rounded-2xl shadow-sm space-y-0.5 cursor-pointer transition active:scale-95 group" title="Tocca per modificare il consumo L/100km">
             <div class="text-[10px] text-[var(--text-muted)] flex items-center justify-between">
               <span>Consumo Reale</span>
-              <span class="text-emerald-500 text-sm">⚡</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold group-hover:bg-emerald-500/25 transition">✏️ Modifica</span>
             </div>
             <div id="kpiEfficiency" class="text-xl font-black text-emerald-500">5.62 L/100km</div>
             <div id="kpiLiters100" class="text-[9px] text-[var(--text-muted)] font-mono">17.8 km/l</div>
@@ -884,6 +884,15 @@
         </div>
 
         <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Consumo Medio Veicolo (L/100km)</label>
+          <div class="flex items-center gap-2">
+            <input type="number" step="0.01" min="1" max="50" id="editCarConsumptionInput" placeholder="es. 5.62" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-mono font-bold focus:outline-none focus:border-amber-500">
+            <span class="text-xs text-[var(--text-muted)] font-bold whitespace-nowrap">L/100km</span>
+          </div>
+          <p class="text-[9px] text-[var(--text-muted)] mt-0.5">Modificabile: aggiorna i consumi e il costo stimato dei viaggi.</p>
+        </div>
+
+        <div>
           <label class="block text-[var(--text-muted)] text-[10px] mb-1">Contachilometri Attuale (km)</label>
           <input type="number" id="editCarOdoInput" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-mono font-bold focus:outline-none focus:border-amber-500">
         </div>
@@ -1053,6 +1062,21 @@
       </div>
 
       <div class="space-y-2 text-xs">
+        <!-- Selezione Data & Ora Rifornimento -->
+        <div class="space-y-1">
+          <div class="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
+            <label class="font-semibold text-[var(--text-main)] flex items-center gap-1">📅 Data Rifornimento</label>
+            <div class="flex gap-1">
+              <button type="button" onclick="setRefuelModalDateQuick('oggi')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-amber-500 text-[var(--text-main)]">Oggi</button>
+              <button type="button" onclick="setRefuelModalDateQuick('ieri')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-amber-500 text-[var(--text-main)]">Ieri</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <input type="date" id="refuelInputDate" class="col-span-2 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-amber-500">
+            <input type="time" id="refuelInputTime" class="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-amber-500">
+          </div>
+        </div>
+
         <div>
           <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Km Odometro Attuale</label>
           <input type="number" id="refuelInputKm" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono font-bold">
@@ -1174,6 +1198,21 @@
       </button>
 
       <div class="space-y-2 text-xs">
+        <!-- Selezione Data & Ora Viaggio -->
+        <div class="space-y-1">
+          <div class="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
+            <label class="font-semibold text-[var(--text-main)] flex items-center gap-1">📅 Data del Viaggio</label>
+            <div class="flex gap-1">
+              <button type="button" onclick="setTripModalDateQuick('oggi')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-blue-500 text-[var(--text-main)]">Oggi</button>
+              <button type="button" onclick="setTripModalDateQuick('ieri')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-blue-500 text-[var(--text-main)]">Ieri</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <input type="date" id="tripInputDate" class="col-span-2 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500">
+            <input type="time" id="tripInputTime" class="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
         <div>
           <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Destinazione / Tratta</label>
           <input type="text" id="tripInputTitle" placeholder="es. Gita Lago di Como / Spesa" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5">

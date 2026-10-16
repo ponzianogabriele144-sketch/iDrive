@@ -12,6 +12,7 @@ const DEFAULT_CARS = [
     id: 0,
     name: "Auto 1",
     fuelType: "Gasolio",
+    consumption: 5.62,
     btDevice: "Bluetooth Auto 1",
     parking: { address: "Posizione non memorizzata", lat: 45.4642, lng: 9.1900, time: "--:--", date: "Nessuna sosta" },
     currentOdo: 0,
@@ -30,6 +31,7 @@ const DEFAULT_CARS = [
     id: 1,
     name: "Auto 2",
     fuelType: "Benzina",
+    consumption: 6.58,
     btDevice: "Bluetooth Auto 2",
     parking: { address: "Posizione non memorizzata", lat: 45.4642, lng: 9.1900, time: "--:--", date: "Nessuna sosta" },
     currentOdo: 0,
@@ -48,6 +50,7 @@ const DEFAULT_CARS = [
     id: 2,
     name: "Auto 3",
     fuelType: "Ibrida",
+    consumption: 4.46,
     btDevice: "Bluetooth Auto 3",
     parking: { address: "Posizione non memorizzata", lat: 45.4642, lng: 9.1900, time: "--:--", date: "Nessuna sosta" },
     currentOdo: 0,
@@ -98,6 +101,9 @@ function loadCars() {
         c.historyMonths = [0, 0, 0, 0, 0, 0];
         c.insurance = { ...def.insurance };
         c.parking = { ...def.parking };
+      }
+      if (!c.consumption || c.consumption <= 0) {
+        c.consumption = def.consumption || (c.fuelType === 'Ibrida' ? 4.46 : (c.fuelType === 'Benzina' ? 6.58 : 5.62));
       }
       if (!c.parking) c.parking = { ...def.parking };
       if (!Array.isArray(c.trips)) c.trips = [];
@@ -698,6 +704,13 @@ function openModalEditCar(index) {
   document.getElementById('editCarNameInput').value = car.name;
   document.getElementById('editCarFuelSelect').value = car.fuelType;
   document.getElementById('editCarOdoInput').value = car.currentOdo || 0;
+  
+  const consInput = document.getElementById('editCarConsumptionInput');
+  if (consInput) {
+    const defaultCons = car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62);
+    consInput.value = (car.consumption || defaultCons).toFixed(2);
+  }
+
   const btInput = document.getElementById('editCarBtInput');
   if (btInput) btInput.value = car.btDevice || '';
   document.getElementById('modalEditCar').classList.remove('hidden');
@@ -708,10 +721,18 @@ function saveCarEdit() {
   const newFuel = document.getElementById('editCarFuelSelect').value;
   const newOdo = parseInt(document.getElementById('editCarOdoInput').value) || 0;
   const btInput = document.getElementById('editCarBtInput');
+  const consInput = document.getElementById('editCarConsumptionInput');
 
   appCars[editingCarIndex].name = newName;
   appCars[editingCarIndex].fuelType = newFuel;
   appCars[editingCarIndex].currentOdo = newOdo;
+
+  if (consInput) {
+    const parsedCons = parseFloat(consInput.value);
+    const defaultCons = newFuel === 'Ibrida' ? 4.46 : (newFuel === 'Benzina' ? 6.58 : 5.62);
+    appCars[editingCarIndex].consumption = (parsedCons && parsedCons > 0) ? parseFloat(parsedCons.toFixed(2)) : defaultCons;
+  }
+
   if (btInput) {
     appCars[editingCarIndex].btDevice = btInput.value.trim() || ('Bluetooth ' + newName);
   }
@@ -773,9 +794,12 @@ function renderAll() {
   const kpiKm = document.getElementById('kpiKmTotal');
   if (kpiKm) kpiKm.innerText = totalKm.toLocaleString('it-IT') + ' km';
 
-  const eff = car.fuelType === 'Ibrida' ? '4.46 L/100km' : (car.fuelType === 'Benzina' ? '6.58 L/100km' : '5.62 L/100km');
-  const secEff = car.fuelType === 'Ibrida' ? '22.4 km/l' : (car.fuelType === 'Benzina' ? '15.2 km/l' : '17.8 km/l');
-  const costKm = car.fuelType === 'Ibrida' ? '€ 0,080 /km' : '€ 0,100 /km';
+  const userCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
+  const eff = userCons.toFixed(2) + ' L/100km';
+  const secEff = (100 / userCons).toFixed(1) + ' km/l';
+  const fuelPrice = car.refuels.length > 0 && car.refuels[0].pricePerLiter ? parseFloat(car.refuels[0].pricePerLiter) : (car.fuelType === 'Benzina' ? 1.819 : (car.fuelType === 'Ibrida' ? 1.809 : 1.759));
+  const costKmNum = (userCons / 100) * fuelPrice;
+  const costKm = '€ ' + costKmNum.toFixed(3).replace('.', ',') + ' /km';
 
   const kpiEff = document.getElementById('kpiEfficiency');
   if (kpiEff) kpiEff.innerText = eff;
@@ -1200,7 +1224,8 @@ function renderTrips(car) {
     const costNum = parseFloat(t.cost) || 0;
     const durNum = parseInt(t.durationMinutes) || 30;
     const avgSpeed = durNum > 0 ? Math.round(kmNum / (durNum / 60)) : 50;
-    const estLiters = (kmNum * (car.fuelType === 'Ibrida' ? 0.0446 : (car.fuelType === 'Benzina' ? 0.0658 : 0.0562))).toFixed(1);
+    const carCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
+    const estLiters = (kmNum * (carCons / 100)).toFixed(1);
 
     const isRoundTrip = (t.title || '').includes('A/R');
     const badgeType = isRoundTrip 
@@ -1920,11 +1945,25 @@ function showCalendarDetail(day) {
     ? `📅 ${day} ${monthName} ${calendarViewYear} (Oggi)`
     : `📅 ${day} ${monthName} ${calendarViewYear}`;
 
+  const actionButtonsHtml = `
+    <div class="flex gap-2 pt-2">
+      <button type="button" onclick="openModalWithDate('modalTrip', ${calendarViewYear}, ${calendarViewMonth}, ${day})" class="flex-1 py-2 px-2.5 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-bold text-[11px] transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm">
+        <span>🛣️ + Viaggio (${day} ${monthName})</span>
+      </button>
+      <button type="button" onclick="openModalWithDate('modalRefuel', ${calendarViewYear}, ${calendarViewMonth}, ${day})" class="flex-1 py-2 px-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 font-bold text-[11px] transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm">
+        <span>⛽ + Pieno (${day} ${monthName})</span>
+      </button>
+    </div>
+  `;
+
   if (matchingRefuels.length === 0 && matchingTrips.length === 0) {
     box.innerHTML = `
-      <div class="py-1">
-        <div class="font-bold text-[var(--text-main)] mb-1">${headerTitle}</div>
-        <p class="text-[11px] text-[var(--text-muted)]">Nessun rifornimento o percorso registrato in questa data.</p>
+      <div class="py-1 space-y-2">
+        <div>
+          <div class="font-bold text-[var(--text-main)] mb-0.5">${headerTitle}</div>
+          <p class="text-[11px] text-[var(--text-muted)]">Nessun rifornimento o percorso registrato in questa data.</p>
+        </div>
+        ${actionButtonsHtml}
       </div>`;
     return;
   }
@@ -1962,6 +2001,7 @@ function showCalendarDetail(day) {
       </div>`;
   });
 
+  html += actionButtonsHtml;
   html += `</div>`;
   box.innerHTML = html;
 }
@@ -2021,9 +2061,13 @@ function initCalendarSystemClockSync() {
   }
 }
 
-// Modali
+// Modali con selezione Data e Ora Giornaliera
 function openModal(id) {
   const car = appCars[activeCarIndex];
+  const now = new Date();
+  const currentIso = getSystemDateKey(now);
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
   if (id === 'modalRefuel') {
     document.getElementById('refuelInputKm').value = car.currentOdo > 0 ? car.currentOdo : '';
     document.getElementById('refuelInputKm').placeholder = 'es. 15400';
@@ -2032,17 +2076,68 @@ function openModal(id) {
     document.getElementById('refuelInputPricePerL').value = car.fuelType === 'Benzina' ? '1.819' : (car.fuelType === 'Ibrida' ? '1.809' : '1.759');
     document.getElementById('refuelInputTotal').value = '';
     document.getElementById('refuelInputTotal').placeholder = '0.00';
+    
+    const rDate = document.getElementById('refuelInputDate');
+    const rTime = document.getElementById('refuelInputTime');
+    if (rDate) rDate.value = currentIso;
+    if (rTime) rTime.value = currentTime;
+
   } else if (id === 'modalTrip') {
     document.getElementById('tripInputTitle').value = '';
     document.getElementById('tripInputTitle').placeholder = 'es. Percorso Lavoro A/R';
     document.getElementById('tripInputKm').value = '';
     document.getElementById('tripInputKm').placeholder = 'es. 25';
+    
+    const tDate = document.getElementById('tripInputDate');
+    const tTime = document.getElementById('tripInputTime');
+    if (tDate) tDate.value = currentIso;
+    if (tTime) tTime.value = currentTime;
+
     updateTripModalEstimates();
   } else if (id === 'modalPdfReport') {
     renderPdfReport();
   }
   const el = document.getElementById(id);
   if (el) el.classList.remove('hidden');
+}
+
+function openModalWithDate(modalId, year, month, day) {
+  openModal(modalId);
+  const m = String(month + 1).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  const isoStr = `${year}-${m}-${d}`;
+  
+  if (modalId === 'modalTrip') {
+    const elDate = document.getElementById('tripInputDate');
+    if (elDate) elDate.value = isoStr;
+  } else if (modalId === 'modalRefuel') {
+    const elDate = document.getElementById('refuelInputDate');
+    if (elDate) elDate.value = isoStr;
+  }
+}
+
+function setTripModalDateQuick(type) {
+  const now = new Date();
+  const input = document.getElementById('tripInputDate');
+  if (!input) return;
+  if (type === 'oggi') {
+    input.value = getSystemDateKey(now);
+  } else if (type === 'ieri') {
+    const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    input.value = getSystemDateKey(y);
+  }
+}
+
+function setRefuelModalDateQuick(type) {
+  const now = new Date();
+  const input = document.getElementById('refuelInputDate');
+  if (!input) return;
+  if (type === 'oggi') {
+    input.value = getSystemDateKey(now);
+  } else if (type === 'ieri') {
+    const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    input.value = getSystemDateKey(y);
+  }
 }
 
 function closeModal(id) {
@@ -2290,10 +2385,41 @@ function saveRefuelFromModal() {
   const p = parseFloat(document.getElementById('refuelInputPricePerL').value) || 0;
   const tot = parseFloat(document.getElementById('refuelInputTotal').value) || (l * p);
 
+  // Lettura data e ora selezionate dall'utente
+  const dateInput = document.getElementById('refuelInputDate');
+  const timeInput = document.getElementById('refuelInputTime');
+  const now = new Date();
+
+  let isoDate = dateInput && dateInput.value ? dateInput.value : getSystemDateKey(now);
+  let timeStr = timeInput && timeInput.value ? timeInput.value : `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  let refuelDateObj = new Date(isoDate + 'T' + (timeStr.length === 5 ? timeStr + ':00' : '12:00:00'));
+  if (isNaN(refuelDateObj.getTime())) {
+    refuelDateObj = new Date();
+    isoDate = getSystemDateKey(refuelDateObj);
+  }
+
+  const isToday = getSystemDateKey(refuelDateObj) === getSystemDateKey(now);
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const isYesterday = getSystemDateKey(refuelDateObj) === getSystemDateKey(yesterday);
+
+  let dateLabel = '';
+  if (isToday) {
+    dateLabel = `Oggi, ${timeStr}`;
+  } else if (isYesterday) {
+    dateLabel = `Ieri, ${timeStr}`;
+  } else {
+    const itShort = IT_MONTH_SHORT[refuelDateObj.getMonth()] || '';
+    dateLabel = `${refuelDateObj.getDate()} ${itShort} ${refuelDateObj.getFullYear()}, ${timeStr}`;
+  }
+
   car.currentOdo = Math.max(km, car.currentOdo);
   car.refuels.unshift({
     id: 'ref_' + Date.now(),
-    date: 'Oggi',
+    date: dateLabel,
+    isoDate,
+    time: timeStr,
+    timestamp: refuelDateObj.getTime(),
     odometer: km,
     liters: l,
     pricePerLiter: p,
@@ -2313,25 +2439,63 @@ function saveRefuelFromModal() {
 }
 
 function updateTripModalEstimates() {
+  const car = appCars[activeCarIndex] || {};
   const km = parseFloat(document.getElementById('tripInputKm').value) || 0;
-  const cost = km * 0.10;
+  const userCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
+  const fuelPrice = car.refuels.length > 0 && car.refuels[0].pricePerLiter ? parseFloat(car.refuels[0].pricePerLiter) : (car.fuelType === 'Benzina' ? 1.819 : (car.fuelType === 'Ibrida' ? 1.809 : 1.759));
+  const cost = km * (userCons / 100) * fuelPrice;
   document.getElementById('tripModalEstFuel').innerText = '€ ' + cost.toFixed(2).replace('.', ',');
 }
 
 function saveTripFromModal() {
   const car = appCars[activeCarIndex];
-  const title = document.getElementById('tripInputTitle').value || 'Viaggio Personale';
+  const title = document.getElementById('tripInputTitle').value.trim() || 'Viaggio Personale';
   const km = parseFloat(document.getElementById('tripInputKm').value) || 0;
   const dur = parseInt(document.getElementById('tripInputDuration').value) || 30;
+
+  // Lettura data e ora selezionate dall'utente
+  const dateInput = document.getElementById('tripInputDate');
+  const timeInput = document.getElementById('tripInputTime');
+  const now = new Date();
+
+  let isoDate = dateInput && dateInput.value ? dateInput.value : getSystemDateKey(now);
+  let timeStr = timeInput && timeInput.value ? timeInput.value : `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  let tripDateObj = new Date(isoDate + 'T' + (timeStr.length === 5 ? timeStr + ':00' : '12:00:00'));
+  if (isNaN(tripDateObj.getTime())) {
+    tripDateObj = new Date();
+    isoDate = getSystemDateKey(tripDateObj);
+  }
+
+  const isToday = getSystemDateKey(tripDateObj) === getSystemDateKey(now);
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const isYesterday = getSystemDateKey(tripDateObj) === getSystemDateKey(yesterday);
+
+  let dateLabel = '';
+  if (isToday) {
+    dateLabel = `Oggi, ${timeStr}`;
+  } else if (isYesterday) {
+    dateLabel = `Ieri, ${timeStr}`;
+  } else {
+    const itShort = IT_MONTH_SHORT[tripDateObj.getMonth()] || '';
+    dateLabel = `${tripDateObj.getDate()} ${itShort} ${tripDateObj.getFullYear()}, ${timeStr}`;
+  }
+
+  const userCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
+  const fuelPrice = car.refuels.length > 0 && car.refuels[0].pricePerLiter ? parseFloat(car.refuels[0].pricePerLiter) : (car.fuelType === 'Benzina' ? 1.819 : (car.fuelType === 'Ibrida' ? 1.809 : 1.759));
+  const cost = km * (userCons / 100) * fuelPrice;
 
   car.currentOdo += Math.round(km);
   car.trips.unshift({
     id: 'trip_' + Date.now(),
     title,
-    date: 'Oggi',
+    date: dateLabel,
+    isoDate,
+    time: timeStr,
+    timestamp: tripDateObj.getTime(),
     km,
     durationMinutes: dur,
-    cost: km * 0.10
+    cost: parseFloat(cost.toFixed(2))
   });
 
   saveCars();
