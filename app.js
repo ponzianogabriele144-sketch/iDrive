@@ -738,34 +738,260 @@ function saveCarEdit() {
   }
 
   saveCars();
-
-  const label = document.getElementById('pillCarLabel' + editingCarIndex);
-  if (label) label.innerText = newName;
-
-  const listName = document.getElementById('listCarName' + editingCarIndex);
-  if (listName) listName.innerText = newName;
-  const listFuel = document.getElementById('listCarFuel' + editingCarIndex);
-  if (listFuel) listFuel.innerText = newFuel;
-  const listOdo = document.getElementById('listCarOdo' + editingCarIndex);
-  if (listOdo) listOdo.innerText = newOdo.toLocaleString('it-IT') + ' km';
-
   closeModal('modalEditCar');
   renderAll();
 }
 
-function switchCar(index) {
-  activeCarIndex = index;
-  [0, 1, 2].forEach(i => {
-    const btn = document.getElementById('pillCar' + i);
-    if (btn) {
-      if (i === index) {
-        btn.className = "flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-bold bg-amber-500 text-black flex items-center justify-center gap-1 transition truncate shadow-md active:scale-95";
-      } else {
-        btn.className = "flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-medium bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center gap-1 transition truncate active:scale-95";
-      }
-    }
-  });
+// Aggiunta Nuovo Veicolo Dinamico
+function openModalAddCar() {
+  const nextNum = appCars.length + 1;
+  const nameInput = document.getElementById('addCarNameInput');
+  const fuelInput = document.getElementById('addCarFuelSelect');
+  const consInput = document.getElementById('addCarConsumptionInput');
+  const odoInput = document.getElementById('addCarOdoInput');
+  const btInput = document.getElementById('addCarBtInput');
+
+  if (nameInput) nameInput.value = `Auto ${nextNum}`;
+  if (fuelInput) fuelInput.value = 'Gasolio';
+  if (consInput) consInput.value = '5.62';
+  if (odoInput) odoInput.value = '0';
+  if (btInput) btInput.value = `Bluetooth Auto ${nextNum}`;
+
+  const modal = document.getElementById('modalAddCar');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function updateAddCarDefaultConsumption() {
+  const fuel = document.getElementById('addCarFuelSelect').value;
+  const consInput = document.getElementById('addCarConsumptionInput');
+  if (!consInput) return;
+  if (fuel === 'Ibrida') consInput.value = '4.46';
+  else if (fuel === 'Benzina') consInput.value = '6.58';
+  else if (fuel === 'GPL') consInput.value = '8.20';
+  else if (fuel === 'Metano') consInput.value = '4.10';
+  else if (fuel === 'Elettrico') consInput.value = '16.50';
+  else consInput.value = '5.62';
+}
+
+function saveNewCar() {
+  const nameInput = document.getElementById('addCarNameInput');
+  const fuelInput = document.getElementById('addCarFuelSelect');
+  const consInput = document.getElementById('addCarConsumptionInput');
+  const odoInput = document.getElementById('addCarOdoInput');
+  const btInput = document.getElementById('addCarBtInput');
+
+  const name = (nameInput ? nameInput.value.trim() : '') || `Auto ${appCars.length + 1}`;
+  const fuel = fuelInput ? fuelInput.value : 'Gasolio';
+  const parsedCons = consInput ? parseFloat(consInput.value) : 5.62;
+  const cons = (parsedCons && parsedCons > 0) ? parsedCons : (fuel === 'Ibrida' ? 4.46 : (fuel === 'Benzina' ? 6.58 : 5.62));
+  const odo = odoInput ? (parseInt(odoInput.value) || 0) : 0;
+  const bt = (btInput ? btInput.value.trim() : '') || `Bluetooth ${name}`;
+
+  const newCar = {
+    id: 'car_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    name,
+    fuelType: fuel,
+    consumption: parseFloat(cons.toFixed(2)),
+    btDevice: bt,
+    parking: { address: "Posizione non memorizzata", lat: 45.4642, lng: 9.1900, time: "--:--", date: "Nessuna sosta" },
+    currentOdo: odo,
+    historyMonths: [0, 0, 0, 0, 0, 0],
+    insurance: {
+      company: "Compagnia Assicurativa",
+      policyType: "RCA Base",
+      expiry: "",
+      daysLeft: 999,
+      cost: 0
+    },
+    refuels: [],
+    trips: []
+  };
+
+  appCars.push(newCar);
+  activeCarIndex = appCars.length - 1; // Seleziona automaticamente la nuova auto
+
+  saveCars();
+  closeModal('modalAddCar');
   renderAll();
+
+  // Banner di conferma stile iOS
+  const banner = document.getElementById('iosNotificationBanner');
+  const msg = document.getElementById('notifBannerMessage');
+  if (banner && msg) {
+    msg.innerHTML = `🚗 <b>Nuova auto aggiunta:</b> "${name}" è ora pronta nel tuo garage!`;
+    banner.classList.remove('hidden');
+    setTimeout(() => { banner.classList.add('hidden'); }, 5000);
+  }
+}
+
+// Eliminazione Veicolo Dinamica con Conferma
+function deleteCar(index) {
+  if (appCars.length <= 1) {
+    alert("Non puoi eliminare l'unica auto presente. Il garage deve contenere almeno un veicolo.");
+    return;
+  }
+  const car = appCars[index];
+  const carName = car ? car.name : 'questo veicolo';
+
+  if (!confirm(`Vuoi davvero eliminare l'auto "${carName}" e tutti i suoi dati dal tuo garage? Questa azione non può essere annullata.`)) {
+    return;
+  }
+
+  appCars.splice(index, 1);
+  if (activeCarIndex >= appCars.length) {
+    activeCarIndex = appCars.length - 1;
+  }
+  if (activeCarIndex < 0) activeCarIndex = 0;
+
+  closeModal('modalEditCar');
+  saveCars();
+  renderAll();
+
+  // Banner di notifica eliminazione
+  const banner = document.getElementById('iosNotificationBanner');
+  const msg = document.getElementById('notifBannerMessage');
+  if (banner && msg) {
+    msg.innerHTML = `🗑️ <b>Veicolo rimosso:</b> "${carName}" è stata eliminata dal tuo garage.`;
+    banner.classList.remove('hidden');
+    setTimeout(() => { banner.classList.add('hidden'); }, 5000);
+  }
+}
+
+function switchCar(index) {
+  if (index < 0 || index >= appCars.length) index = 0;
+  activeCarIndex = index;
+  renderGaragePills();
+  renderAll();
+}
+
+function renderGaragePills() {
+  const container = document.getElementById('garagePillsContainer');
+  if (!container) return;
+
+  const headerLabel = document.getElementById('garageHeaderLabel');
+  if (headerLabel) {
+    headerLabel.innerText = `Garage Personale (${appCars.length} ${appCars.length === 1 ? 'Veicolo' : 'Veicoli'})`;
+  }
+
+  let html = '';
+  appCars.forEach((c, idx) => {
+    const isActive = (idx === activeCarIndex);
+    const btnClass = isActive
+      ? "min-w-[90px] flex-1 min-h-[38px] py-2 px-2.5 rounded-xl text-xs font-bold bg-amber-500 text-black flex items-center justify-center gap-1.5 transition truncate shadow-md active:scale-95"
+      : "min-w-[90px] flex-1 min-h-[38px] py-2 px-2.5 rounded-xl text-xs font-medium bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center gap-1.5 transition truncate active:scale-95";
+    html += `
+      <button type="button" onclick="switchCar(${idx})" id="pillCar${idx}" class="${btnClass}">
+        <span>🚗</span> <span class="truncate">${c.name}</span>
+      </button>
+    `;
+  });
+
+  html += `
+    <button type="button" onclick="openModalAddCar()" class="min-h-[38px] px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 flex items-center justify-center gap-1 whitespace-nowrap active:scale-95 transition" title="Aggiungi Nuovo Veicolo">
+      <span>➕ Auto</span>
+    </button>
+  `;
+
+  container.innerHTML = html;
+}
+
+function renderGarageList() {
+  const container = document.getElementById('garageListContainer');
+  if (!container) return;
+
+  const titleEl = document.getElementById('garageSectionTitle');
+  if (titleEl) {
+    titleEl.innerText = `Garage Veicoli (${appCars.length} Auto)`;
+  }
+
+  let html = '';
+  appCars.forEach((c, idx) => {
+    const isActive = (idx === activeCarIndex);
+    const borderStyle = isActive ? 'border-amber-500/60 bg-amber-500/10' : 'border-[var(--border-color)] bg-[var(--bg-sub)]';
+    const activeBadge = isActive ? '<span class="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/25 text-amber-400 font-bold ml-1.5 border border-amber-500/30">Attiva</span>' : '';
+    const userCons = (c.consumption || (c.fuelType === 'Ibrida' ? 4.46 : (c.fuelType === 'Benzina' ? 6.58 : 5.62))).toFixed(2);
+    const canDelete = appCars.length > 1;
+
+    html += `
+      <div class="p-3 rounded-xl ${borderStyle} border flex justify-between items-center transition">
+        <div class="space-y-0.5 cursor-pointer flex-1 pr-2" onclick="switchCar(${idx})" title="Tocca per selezionare quest'auto">
+          <div class="flex items-center">
+            <span class="font-bold text-xs text-[var(--text-main)]">${c.name}</span>
+            ${activeBadge}
+          </div>
+          <div class="text-[10.5px] text-[var(--text-muted)] flex items-center gap-2">
+            <span>⛽ ${c.fuelType}</span>
+            <span>•</span>
+            <span>⚡ ${userCons} L/100km</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="text-right mr-1">
+            <span class="text-[11px] text-[var(--text-sub)] font-mono font-bold block">${Number(c.currentOdo || 0).toLocaleString('it-IT')} km</span>
+          </div>
+          <button type="button" onclick="openModalEditCar(${idx})" class="p-1.5 px-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-amber-500 text-amber-500 text-xs transition active:scale-95" title="Modifica Veicolo">
+            ✏️
+          </button>
+          <button type="button" onclick="deleteCar(${idx})" ${!canDelete ? 'disabled' : ''} class="p-1.5 px-2 rounded-lg ${!canDelete ? 'opacity-30 cursor-not-allowed bg-zinc-800 text-zinc-500' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20'} text-xs transition active:scale-95" title="Elimina Veicolo">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// Palette colori dinamica per veicoli del garage
+const CAR_PALETTE = [
+  { bg: 'bg-amber-500', hex: '#f59e0b', text: 'text-amber-400' },
+  { bg: 'bg-emerald-500', hex: '#10b981', text: 'text-emerald-400' },
+  { bg: 'bg-indigo-500', hex: '#6366f1', text: 'text-indigo-400' },
+  { bg: 'bg-rose-500', hex: '#f43f5e', text: 'text-rose-400' },
+  { bg: 'bg-sky-500', hex: '#0ea5e9', text: 'text-sky-400' },
+  { bg: 'bg-purple-500', hex: '#a855f7', text: 'text-purple-400' },
+  { bg: 'bg-teal-500', hex: '#14b8a6', text: 'text-teal-400' },
+  { bg: 'bg-orange-500', hex: '#f97316', text: 'text-orange-400' }
+];
+
+function renderVolumetricDistribution() {
+  const barContainer = document.getElementById('volumetricDistributionBar');
+  const legendContainer = document.getElementById('volumetricDistributionLegend');
+  if (!barContainer || !legendContainer) return;
+
+  const totalGarageLiters = appCars.reduce((tot, c) => tot + (c.refuels || []).reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0), 0);
+
+  if (totalGarageLiters === 0) {
+    barContainer.innerHTML = '<div class="w-full h-full bg-zinc-800"></div>';
+    legendContainer.innerHTML = '<span class="text-zinc-500 italic">Nessun rifornimento registrato nel garage.</span>';
+    return;
+  }
+
+  let barHtml = '';
+  let legendHtml = '';
+
+  appCars.forEach((c, idx) => {
+    const cLiters = (c.refuels || []).reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0);
+    const pct = totalGarageLiters > 0 ? ((cLiters / totalGarageLiters) * 100) : 0;
+    const color = CAR_PALETTE[idx % CAR_PALETTE.length];
+
+    if (pct > 0) {
+      barHtml += `<div class="${color.bg} h-full transition-all duration-300" style="width: ${pct.toFixed(1)}%" title="${c.name}: ${cLiters.toFixed(1)} L (${pct.toFixed(0)}%)"></div>`;
+    }
+
+    legendHtml += `
+      <div class="flex items-center gap-1.5 mr-2 mb-1">
+        <span class="w-2 h-2 rounded-full ${color.bg}"></span>
+        <span class="font-medium text-[var(--text-sub)]">${c.name}:</span>
+        <span class="font-mono font-bold text-[var(--text-main)]">${cLiters.toFixed(1)} L</span>
+        <span class="text-[9px] text-[var(--text-muted)]">(${pct.toFixed(0)}%)</span>
+      </div>
+    `;
+  });
+
+  barContainer.innerHTML = barHtml || '<div class="w-full h-full bg-zinc-800"></div>';
+  legendContainer.innerHTML = legendHtml;
 }
 
 // ==================== RENDERING PRINCIPALE ====================
@@ -820,15 +1046,8 @@ function renderAll() {
   if (statMonthly) statMonthly.innerText = totalLitersCar.toFixed(1) + ' L';
   if (statTotGarage) statTotGarage.innerText = totalLitersGarage.toFixed(1) + ' L';
 
-  // Ripartizione volumetrica dinamica per auto
-  [0, 1, 2].forEach(i => {
-    const c = appCars[i];
-    const lbl = document.getElementById('distLabelCar' + i);
-    const val = document.getElementById('distValCar' + i);
-    const cLiters = c ? c.refuels.reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0) : 0;
-    if (lbl) lbl.innerText = c ? c.name : ('Auto ' + (i + 1));
-    if (val) val.innerText = cLiters.toFixed(1) + ' L';
-  });
+  // Ripartizione volumetrica dinamica per auto del garage
+  renderVolumetricDistribution();
 
   const avgCost = car.trips.length > 0 ? (car.trips.reduce((acc, t) => acc + (t.cost || 0), 0) / car.trips.length) : 0;
   const avgCostLabel = document.getElementById('labelAvgTripCost');
@@ -837,20 +1056,9 @@ function renderAll() {
   const btDevLabel = document.getElementById('btDeviceNameLabel');
   if (btDevLabel) btDevLabel.innerText = car.btDevice || ('Bluetooth ' + car.name);
 
-  // Sincronizza etichette Garage
-  [0, 1, 2].forEach(i => {
-    const c = appCars[i];
-    if (c) {
-      const pl = document.getElementById('pillCarLabel' + i);
-      if (pl) pl.innerText = c.name;
-      const ln = document.getElementById('listCarName' + i);
-      if (ln) ln.innerText = c.name;
-      const lf = document.getElementById('listCarFuel' + i);
-      if (lf) lf.innerText = c.fuelType;
-      const lo = document.getElementById('listCarOdo' + i);
-      if (lo) lo.innerText = Number(c.currentOdo || 0).toLocaleString('it-IT') + ' km';
-    }
-  });
+  // Aggiorna componenti dinamici Garage
+  renderGaragePills();
+  renderGarageList();
 
   renderFeed(car);
   renderRefuels(car);
@@ -1372,36 +1580,158 @@ function renderParking(car) {
   const extMapsBtn = document.getElementById('btnExternalMaps');
   const streetLabel = document.getElementById('mapStreetLabel');
 
-  if (car.parking) {
-    if (addrEl) addrEl.innerText = car.parking.address;
-    if (timeEl) timeEl.innerText = `${car.parking.date}, ${car.parking.time} • Memorizzata automaticamente`;
-    if (carLabel) carLabel.innerText = `${car.name} • Parcheggiata`;
-    if (coordsLabel && car.parking.lat && car.parking.lng) {
-      coordsLabel.innerText = `${car.parking.lat.toFixed(4)}° N, ${car.parking.lng.toFixed(4)}° E`;
+  if (!car) return;
+  const p = car.parking || { address: "Posizione non memorizzata", lat: 45.4642, lng: 9.1900, time: "--:--", date: "In attesa di sosta" };
+
+  if (addrEl) addrEl.innerText = p.address || "Posizione non memorizzata";
+  if (timeEl) timeEl.innerText = `${p.date || 'Oggi'}, ${p.time || '--:--'} • Memorizzata automaticamente`;
+  if (carLabel) carLabel.innerText = `${car.name} • Parcheggiata`;
+  if (coordsLabel) {
+    if (p.lat && p.lng) {
+      coordsLabel.innerText = `${Number(p.lat).toFixed(4)}° N, ${Number(p.lng).toFixed(4)}° E`;
+    } else {
+      coordsLabel.innerText = `--° N, --° E`;
     }
-    if (extMapsBtn && car.parking.lat && car.parking.lng) {
-      extMapsBtn.href = `https://maps.apple.com/?q=${car.parking.lat},${car.parking.lng}`;
+  }
+  if (extMapsBtn) {
+    if (p.lat && p.lng) {
+      extMapsBtn.href = `https://maps.apple.com/?q=${p.lat},${p.lng}`;
+    } else {
+      extMapsBtn.href = "https://maps.apple.com/";
     }
-    if (streetLabel && car.parking.address) {
-      const streetName = car.parking.address.split(',')[0].toUpperCase();
-      streetLabel.textContent = streetName;
-    }
+  }
+  if (streetLabel && p.address) {
+    const streetName = p.address.split(',')[0].toUpperCase();
+    streetLabel.textContent = streetName;
   }
 }
 
 function showDirectionsToCar() {
   const car = appCars[activeCarIndex];
+  if (!car) return;
   const p = car.parking || { address: 'Via Alessandro Manzoni 14, Milano', lat: 45.4682, lng: 9.1912 };
   const banner = document.getElementById('iosNotificationBanner');
   const msg = document.getElementById('notifBannerMessage');
-  const coordsText = p.lat && p.lng ? `[${p.lat.toFixed(4)}° N, ${p.lng.toFixed(4)}° E]` : '';
+  const coordsText = (p.lat && p.lng) ? `[${Number(p.lat).toFixed(4)}° N, ${Number(p.lng).toFixed(4)}° E]` : '';
   if (banner && msg) {
     msg.innerHTML = `📍 <b>Posizione Auto (${car.name}):</b> Parcheggiata in <b>${p.address}</b> ${coordsText}. Apertura Apple Mappe in corso...`;
     banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 5000);
   }
   if (p.lat && p.lng) {
     window.open(`https://maps.apple.com/?daddr=${p.lat},${p.lng}&dirflg=w`, '_blank');
   }
+}
+
+// ==================== METODO 2: RILEVAMENTO GPS SOSTA AUTOMATICA ====================
+// Zero consumo di batteria in standby: il GPS del telefono viene attivato SOLO per 1-2 secondi
+// al termine della tratta (Stop GPS o disconnessione Bluetooth) oppure su richiesta manuale.
+function detectCurrentGpsParking() {
+  const car = appCars[activeCarIndex];
+  if (!car) return;
+  detectAndSaveParkingLocation(car, { showNotification: true, isAuto: false });
+}
+
+function detectAndSaveParkingLocation(car, { showNotification = true, isAuto = false } = {}) {
+  if (!car) return;
+  const banner = document.getElementById('iosNotificationBanner');
+  const msg = document.getElementById('notifBannerMessage');
+
+  if (showNotification && banner && msg && !isAuto) {
+    msg.innerHTML = `🛰️ <b>Rilevamento GPS in corso:</b> Acquisizione coordinate posizione per <b>${car.name}</b>...`;
+    banner.classList.remove('hidden');
+  }
+
+  if (!navigator.geolocation) {
+    if (banner && msg) {
+      msg.innerHTML = `⚠️ <b>Geolocalizzazione non supportata</b> dal tuo browser o dispositivo.`;
+      banner.classList.remove('hidden');
+      setTimeout(() => banner.classList.add('hidden'), 4000);
+    }
+    return;
+  }
+
+  const geoOptions = {
+    enableHighAccuracy: true,
+    timeout: 9000,
+    maximumAge: 0
+  };
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const accuracy = Math.round(position.coords.accuracy || 5);
+      const nowStr = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      const nowDateStr = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+
+      let fullAddress = `Posizione GPS [${lat.toFixed(4)}, ${lng.toFixed(4)}]`;
+
+      try {
+        // Reverse Geocoding gratuito OpenStreetMap Nominatim
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.address) {
+            const addr = data.address;
+            const road = addr.road || addr.pedestrian || addr.street || addr.suburb || 'Via Rilevata';
+            const house = addr.house_number ? ' ' + addr.house_number : '';
+            const city = addr.city || addr.town || addr.village || addr.municipality || 'Posizione Sosta';
+            fullAddress = `${road}${house}, ${city}`;
+          } else if (data && data.display_name) {
+            fullAddress = data.display_name.split(',').slice(0, 3).join(',');
+          }
+        }
+      } catch (e) {
+        console.warn("Reverse geocode OSM fallback:", e);
+      }
+
+      car.parking = {
+        address: fullAddress,
+        lat: lat,
+        lng: lng,
+        time: nowStr,
+        date: "Oggi (" + nowDateStr + ")"
+      };
+
+      saveCars();
+      renderParking(car);
+
+      if (showNotification && banner && msg) {
+        const titleBadge = isAuto ? "<b>Sosta Memorizzata Automaticamente (Metodo 2)</b>" : "<b>Sosta Rilevata con GPS</b>";
+        msg.innerHTML = `📍 ${titleBadge} per <b>${car.name}</b>:<br><span class="text-white font-bold">${fullAddress}</span> <span class="text-zinc-400 text-[10px]">[±${accuracy}m]</span>`;
+        banner.classList.remove('hidden');
+        setTimeout(() => { banner.classList.add('hidden'); }, 6000);
+      }
+    },
+    (err) => {
+      console.warn("Geolocalizzazione GPS:", err);
+      const nowStr = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      if (!isAuto && banner && msg) {
+        msg.innerHTML = `⚠️ <b>Permesso GPS richiesto:</b> Per rilevare la sosta reale del veicolo, consenti l'accesso alla geolocalizzazione nelle impostazioni dell'iPhone o di Safari.`;
+        banner.classList.remove('hidden');
+        setTimeout(() => banner.classList.add('hidden'), 5000);
+      } else if (isAuto && (!car.parking || !car.parking.lat)) {
+        car.parking = {
+          address: "Parcheggio Arrivo Rilevato",
+          lat: 45.4642,
+          lng: 9.1900,
+          time: nowStr,
+          date: "Oggi"
+        };
+        saveCars();
+        renderParking(car);
+      }
+    },
+    geoOptions
+  );
 }
 
 function toggleBtSim() {
@@ -1479,7 +1809,9 @@ function triggerBtDisconnect() {
   const car = appCars[btSession.carIndex];
   const doneKm = Math.max(1.8, parseFloat(btSession.km.toFixed(1)));
   const minutes = Math.max(2, Math.round(btSession.sec / 60) || 4);
-  const costTrip = doneKm * (car.fuelType === 'Ibrida' ? 0.08 : 0.10);
+  const defaultCons = car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62);
+  const userCons = car.consumption || defaultCons;
+  const costTrip = (doneKm * userCons / 100) * 1.78;
 
   // Salva viaggio nel diario
   car.currentOdo += Math.round(doneKm);
@@ -1489,31 +1821,8 @@ function triggerBtDisconnect() {
     date: "Oggi",
     km: doneKm,
     durationMinutes: minutes,
-    cost: costTrip
+    cost: parseFloat(costTrip.toFixed(2))
   });
-
-  // Salva posizione sosta / parcheggio con coordinate precise
-  const nowStr = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  let pAddr = "Via Alessandro Manzoni 14, Milano";
-  let pLat = 45.4682;
-  let pLng = 9.1912;
-  if (btSession.carIndex === 1) {
-    pAddr = "Corso Buenos Aires 32, Milano";
-    pLat = 45.4795;
-    pLng = 9.2085;
-  } else if (btSession.carIndex === 2) {
-    pAddr = "Piazza del Duomo 1, Milano";
-    pLat = 45.4642;
-    pLng = 9.1900;
-  }
-
-  car.parking = {
-    address: pAddr,
-    lat: pLat,
-    lng: pLng,
-    time: nowStr,
-    date: "Oggi"
-  };
 
   saveCars();
 
@@ -1545,15 +1854,10 @@ function triggerBtDisconnect() {
     if (label) label.innerText = "BT Auto";
   }
 
-  // Notifica iOS con posizione esatta e coordinate GPS
-  const banner = document.getElementById('iosNotificationBanner');
-  const msg = document.getElementById('notifBannerMessage');
-  if (banner && msg) {
-    msg.innerHTML = `🅿️ <b>Sosta Rilevata (${car.btDevice}):</b> Auto parcheggiata in <b>${car.parking.address}</b> [${car.parking.lat}° N, ${car.parking.lng}° E]. Mappa e coordinate aggiornate in Viaggi!`;
-    banner.classList.remove('hidden');
-  }
-
   renderAll();
+
+  // Metodo 2: Rilevamento automatico sosta GPS all'arresto del veicolo
+  detectAndSaveParkingLocation(car, { showNotification: true, isAuto: true });
 }
 
 // Switch delle 6 Schede di Navigazione
@@ -2153,17 +2457,23 @@ function calcRefuelModalTotal() {
 
 // ==================== RENDERING REPORT PDF DINAMICO ====================
 function renderPdfReport() {
-  // 1. Spese per auto nella legenda del PDF
-  [0, 1, 2].forEach(i => {
-    const c = appCars[i];
-    const lbl = document.getElementById('pdfLegendCar' + i);
-    const val = document.getElementById('pdfValCar' + i);
-    if (c) {
+  // 1. Spese per auto nella legenda del PDF (100% dinamico per tutto il garage)
+  const legendCont = document.getElementById('pdfLegendCarsContainer');
+  if (legendCont) {
+    let legHtml = '';
+    appCars.forEach((c, idx) => {
+      const color = CAR_PALETTE[idx % CAR_PALETTE.length];
       const fuelCost = (c.refuels || []).reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
-      if (lbl) lbl.innerText = c.name;
-      if (val) val.innerText = '€ ' + fuelCost.toFixed(1).replace('.', ',');
-    }
-  });
+      legHtml += `
+        <div class="flex items-center gap-1">
+          <span class="w-2 h-2 rounded-sm ${color.bg} inline-block"></span>
+          <span>${c.name}:</span>
+          <span class="font-bold text-zinc-900">€ ${fuelCost.toFixed(1).replace('.', ',')}</span>
+        </div>
+      `;
+    });
+    legendCont.innerHTML = legHtml;
+  }
 
   // 2. Tabella Tratte Dinamica
   const tbody = document.getElementById('pdfTripsTableBody');
@@ -2538,6 +2848,10 @@ function stopGpsLive() {
   const car = appCars[activeCarIndex];
   const doneKm = parseFloat(liveTracking.km.toFixed(1));
   if (doneKm > 0) {
+    const defaultCons = car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62);
+    const userCons = car.consumption || defaultCons;
+    const costTrip = (doneKm * userCons / 100) * 1.78;
+
     car.currentOdo += Math.round(doneKm);
     car.trips.unshift({
       id: 'trip_' + Date.now(),
@@ -2545,11 +2859,14 @@ function stopGpsLive() {
       date: 'Oggi',
       km: doneKm,
       durationMinutes: Math.max(1, Math.round(liveTracking.seconds / 60)),
-      cost: doneKm * 0.10
+      cost: parseFloat(costTrip.toFixed(2))
     });
     saveCars();
     renderAll();
   }
+
+  // Metodo 2: Rilevamento automatico sosta GPS all'arresto del viaggio
+  detectAndSaveParkingLocation(car, { showNotification: true, isAuto: true });
 }
 
 // ==================== FIXED NATIVE BOTTOM DOCK ====================

@@ -132,26 +132,22 @@
         </div>
       </div>
 
-      <!-- Garage Personale: 3 Macchine Modificabili -->
+      <!-- Garage Personale: Macchine Modificabili Dinamiche -->
       <div class="space-y-1.5 pt-0.5">
         <div class="flex items-center justify-between px-1">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Garage Personale (3 Veicoli)</span>
-          <button onclick="openModalEditCar(activeCarIndex)" class="text-[10px] font-semibold text-amber-500 hover:text-amber-400 flex items-center gap-1 transition py-0.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-            Modifica Auto
-          </button>
+          <span id="garageHeaderLabel" class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Garage Personale (3 Veicoli)</span>
+          <div class="flex items-center gap-2">
+            <button onclick="openModalAddCar()" class="text-[10px] font-bold text-amber-500 hover:text-amber-400 flex items-center gap-1 transition py-0.5 active:scale-95">
+              <span>➕ Auto</span>
+            </button>
+            <button onclick="openModalEditCar(activeCarIndex)" class="text-[10px] font-semibold text-[var(--text-sub)] hover:text-amber-400 flex items-center gap-1 transition py-0.5">
+              <span>✏️ Modifica</span>
+            </button>
+          </div>
         </div>
 
-        <div class="flex items-center gap-1.5 w-full">
-          <button onclick="switchCar(0)" id="pillCar0" class="flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-bold bg-amber-500 text-black flex items-center justify-center gap-1 transition truncate shadow-md active:scale-95">
-            🚗 <span id="pillCarLabel0" class="truncate">Auto 1</span>
-          </button>
-          <button onclick="switchCar(1)" id="pillCar1" class="flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-medium bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center gap-1 transition truncate active:scale-95">
-            🚗 <span id="pillCarLabel1" class="truncate">Auto 2</span>
-          </button>
-          <button onclick="switchCar(2)" id="pillCar2" class="flex-1 min-h-[38px] py-2 px-2 rounded-xl text-xs font-medium bg-[var(--bg-card)] text-[var(--text-sub)] hover:text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center gap-1 transition truncate active:scale-95">
-            🚗 <span id="pillCarLabel2" class="truncate">Auto 3</span>
-          </button>
+        <div id="garagePillsContainer" class="flex items-center gap-1.5 w-full overflow-x-auto pb-0.5 no-scrollbar">
+          <!-- Popolato dinamicamente da renderGaragePills() -->
         </div>
       </div>
     </header>
@@ -486,9 +482,14 @@
                 <p id="parkingTimeLabel" class="text-[10px] text-[var(--text-muted)]">Punto preciso rilevato alla sosta</p>
               </div>
             </div>
-            <span id="parkingBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-              Auto Parcheggiata
-            </span>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="detectCurrentGpsParking()" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 border border-indigo-500/30 flex items-center gap-1 active:scale-95 transition" title="Rileva posizione esatta con il sensore GPS dell'iPhone">
+                <span>📍 Rileva Sosta GPS</span>
+              </button>
+              <span id="parkingBadge" class="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                Parcheggiata
+              </span>
+            </div>
           </div>
 
           <!-- Mappa Integrata: Stile Apple Maps con Pin Pulsante e Coordinate Esatte -->
@@ -738,15 +739,11 @@
               <span>Ripartizione Litri Mese</span>
               <span class="font-mono font-bold text-[var(--text-main)]">Mese Corrente</span>
             </div>
-            <div class="w-full h-2.5 rounded-full bg-zinc-800 overflow-hidden flex">
-              <div class="bg-amber-500 h-full" style="width: 33.3%" title="Auto 1"></div>
-              <div class="bg-blue-500 h-full" style="width: 33.3%" title="Auto 2"></div>
-              <div class="bg-emerald-500 h-full" style="width: 33.4%" title="Auto 3"></div>
+            <div id="volumetricDistributionBar" class="w-full h-2.5 rounded-full bg-zinc-800 overflow-hidden flex">
+              <!-- Popolato dinamicamente da renderVolumetricDistribution() -->
             </div>
-            <div class="flex justify-between text-[10px] text-[var(--text-muted)] pt-0.5">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> <span id="distLabelCar0">Auto 1</span>: <b id="distValCar0">0.0 L</b></span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> <span id="distLabelCar1">Auto 2</span>: <b id="distValCar1">0.0 L</b></span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <span id="distLabelCar2">Auto 3</span>: <b id="distValCar2">0.0 L</b></span>
+            <div id="volumetricDistributionLegend" class="flex flex-wrap gap-2 text-[10px] text-[var(--text-muted)] pt-0.5">
+              <!-- Popolato dinamicamente -->
             </div>
           </div>
         </div>
@@ -758,50 +755,26 @@
             <span class="text-[10px] text-amber-500 font-semibold">Tutto in 1 Foglio A4</span>
           </div>
           <div class="space-y-1.5 text-[11px] text-[var(--text-sub)]">
-            <div class="flex items-center gap-2"><span>📈</span> <span><b>Grafico dell'andamento carburante</b> delle 3 auto.</span></div>
+            <div class="flex items-center gap-2"><span>📈</span> <span><b>Grafico dell'andamento carburante</b> di tutte le auto.</span></div>
             <div class="flex items-center gap-2"><span>📋</span> <span><b>Tabella dettagliata dei tratti:</b> km, costo, durata, auto usata.</span></div>
             <div class="flex items-center gap-2"><span>⏰</span> <span><b>Resoconto delle ultime 24 ore</b> (pronto per invio ore 8:00).</span></div>
             <div class="flex items-center gap-2"><span>🛡️</span> <span><b>Stato scadenze assicurative</b> e chilometraggio odometri.</span></div>
           </div>
         </div>
 
-        <!-- Auto Configurate Modificabili -->
-        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-4 rounded-2xl shadow-sm space-y-2">
+        <!-- Auto Configurate Modificabili Dinamiche -->
+        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-4 rounded-2xl shadow-sm space-y-3">
           <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-[var(--text-main)]">Le Tue 3 Auto</span>
-            <span class="text-[10px] text-[var(--text-muted)]">Tocca per modificare</span>
+            <div>
+              <span id="garageSectionTitle" class="text-xs font-bold text-[var(--text-main)]">Garage Veicoli</span>
+              <p class="text-[10px] text-[var(--text-muted)]">Aggiungi, modifica o elimina auto dal tuo garage</p>
+            </div>
+            <button type="button" onclick="openModalAddCar()" class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-[10.5px] flex items-center gap-1 shadow-sm transition active:scale-95">
+              <span>➕ Aggiungi Auto</span>
+            </button>
           </div>
-          <div class="space-y-1.5 text-xs">
-            <div onclick="openModalEditCar(0)" class="p-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex justify-between items-center cursor-pointer hover:border-amber-500/50 transition">
-              <div>
-                <span id="listCarName0" class="font-bold text-[var(--text-main)]">Auto 1</span>
-                <span id="listCarFuel0" class="text-[10px] text-[var(--text-muted)] block">Gasolio</span>
-              </div>
-              <div class="text-right">
-                <span id="listCarOdo0" class="text-[var(--text-sub)] font-mono">0 km</span>
-                <span class="text-[10px] text-amber-500 block">Modifica ✏️</span>
-              </div>
-            </div>
-            <div onclick="openModalEditCar(1)" class="p-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex justify-between items-center cursor-pointer hover:border-amber-500/50 transition">
-              <div>
-                <span id="listCarName1" class="font-bold text-[var(--text-main)]">Auto 2</span>
-                <span id="listCarFuel1" class="text-[10px] text-[var(--text-muted)] block">Benzina</span>
-              </div>
-              <div class="text-right">
-                <span id="listCarOdo1" class="text-[var(--text-sub)] font-mono">0 km</span>
-                <span class="text-[10px] text-amber-500 block">Modifica ✏️</span>
-              </div>
-            </div>
-            <div onclick="openModalEditCar(2)" class="p-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] flex justify-between items-center cursor-pointer hover:border-amber-500/50 transition">
-              <div>
-                <span id="listCarName2" class="font-bold text-[var(--text-main)]">Auto 3</span>
-                <span id="listCarFuel2" class="text-[10px] text-[var(--text-muted)] block">Ibrida</span>
-              </div>
-              <div class="text-right">
-                <span id="listCarOdo2" class="text-[var(--text-sub)] font-mono">0 km</span>
-                <span class="text-[10px] text-amber-500 block">Modifica ✏️</span>
-              </div>
-            </div>
+          <div id="garageListContainer" class="space-y-2 text-xs">
+            <!-- Popolato dinamicamente da renderGarageList() -->
           </div>
           <div class="pt-2 border-t border-[var(--border-color)] flex justify-between items-center">
             <span class="text-[10px] text-[var(--text-muted)]">Gestione Dati:</span>
@@ -854,6 +827,61 @@
     </nav>
   </main>
 
+  <!-- ==================== MODAL: AGGIUNGI NUOVO VEICOLO ==================== -->
+  <div id="modalAddCar" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl text-xs">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-base">🚗</span>
+          <h3 class="font-bold text-xs text-[var(--text-main)]">Aggiungi Nuovo Veicolo</h3>
+        </div>
+        <button onclick="closeModal('modalAddCar')" class="text-[var(--text-muted)] hover:text-[var(--text-main)]">✕</button>
+      </div>
+
+      <div class="space-y-2.5">
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Nome Veicolo</label>
+          <input type="text" id="addCarNameInput" placeholder="es. Auto 4, Fiat Panda, Golf" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-bold focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Tipo Carburante</label>
+          <select id="addCarFuelSelect" onchange="updateAddCarDefaultConsumption()" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500">
+            <option value="Gasolio">Gasolio (Diesel)</option>
+            <option value="Benzina">Benzina</option>
+            <option value="Ibrida">Ibrida</option>
+            <option value="GPL">GPL</option>
+            <option value="Metano">Metano</option>
+            <option value="Elettrico">Elettrico</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Consumo Stimato (L/100km)</label>
+          <div class="flex items-center gap-2">
+            <input type="number" step="0.01" min="1" max="50" id="addCarConsumptionInput" value="5.62" placeholder="es. 5.62" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-mono font-bold focus:outline-none focus:border-amber-500">
+            <span class="text-xs text-[var(--text-muted)] font-bold whitespace-nowrap">L/100km</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Contachilometri Iniziale (km)</label>
+          <input type="number" id="addCarOdoInput" value="0" placeholder="0" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 font-mono font-bold focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div>
+          <label class="block text-[var(--text-muted)] text-[10px] mb-1">Dispositivo Bluetooth Associato (Opzionale)</label>
+          <input type="text" id="addCarBtInput" placeholder="es. Bluetooth Auto" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="button" onclick="closeModal('modalAddCar')" class="flex-1 py-2.5 rounded-xl bg-zinc-700/50 text-[var(--text-sub)] text-xs font-semibold">Annulla</button>
+        <button type="button" onclick="saveNewCar()" class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold">Salva Veicolo</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== MODAL: MODIFICA VEICOLO ==================== -->
   <div id="modalEditCar" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl text-xs">
@@ -902,9 +930,12 @@
           <input type="text" id="editCarBtInput" placeholder="es. Bluetooth Auto" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500">
         </div>
 
-        <div class="pt-1">
-          <button type="button" onclick="resetCarData(editingCarIndex)" class="w-full py-2 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold border border-red-500/20 transition active:scale-95">
-            🗑️ Azzera Dati e Chilometri di Questa Auto
+        <div class="pt-1 flex gap-2">
+          <button type="button" onclick="resetCarData(editingCarIndex)" class="flex-1 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:bg-zinc-700 text-[10.5px] font-semibold border border-zinc-700 transition active:scale-95">
+            🔄 Azzera Dati
+          </button>
+          <button type="button" onclick="deleteCar(editingCarIndex)" class="flex-1 py-2 rounded-xl bg-red-500/15 text-red-400 hover:bg-red-500/25 text-[10.5px] font-bold border border-red-500/30 transition active:scale-95">
+            🗑️ Elimina Auto
           </button>
         </div>
       </div>
@@ -971,10 +1002,8 @@
               <text x="220" y="66" font-size="8" fill="#71717a">Set</text>
               <text x="280" y="66" font-size="8" fill="#71717a">Ott</text>
             </svg>
-            <div class="flex justify-around w-full text-[8px] text-zinc-600 mt-1">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> <span id="pdfLegendCar0">Auto 1</span> (<span id="pdfValCar0">€ 0,0</span>)</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> <span id="pdfLegendCar1">Auto 2</span> (<span id="pdfValCar1">€ 0,0</span>)</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <span id="pdfLegendCar2">Auto 3</span> (<span id="pdfValCar2">€ 0,0</span>)</span>
+            <div id="pdfLegendCarsContainer" class="flex flex-wrap justify-around w-full text-[8px] text-zinc-600 mt-1 gap-1.5">
+              <!-- Popolato dinamicamente da renderPdfReport() -->
             </div>
           </div>
         </div>
