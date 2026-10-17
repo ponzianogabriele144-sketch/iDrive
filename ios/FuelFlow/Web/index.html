@@ -1091,19 +1091,22 @@
       </div>
 
       <div class="space-y-2 text-xs">
-        <!-- Selezione Data & Ora Rifornimento -->
+        <!-- Selezione Data & Ora Rifornimento Perfezionata -->
         <div class="space-y-1">
           <div class="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
-            <label class="font-semibold text-[var(--text-main)] flex items-center gap-1">📅 Data Rifornimento</label>
-            <div class="flex gap-1">
-              <button type="button" onclick="setRefuelModalDateQuick('oggi')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-amber-500 text-[var(--text-main)]">Oggi</button>
-              <button type="button" onclick="setRefuelModalDateQuick('ieri')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-amber-500 text-[var(--text-main)]">Ieri</button>
+            <label class="font-semibold text-[var(--text-main)] flex items-center gap-1">📅 Data e Ora Rifornimento</label>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="setRefuelModalDateQuick('oggi')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-amber-500 text-[var(--text-main)] transition active:scale-95">Oggi</button>
+              <button type="button" onclick="setRefuelModalDateQuick('ieri')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-amber-500 text-[var(--text-main)] transition active:scale-95">Ieri</button>
+              <button type="button" onclick="setRefuelModalDateQuick('altroieri')" class="px-1.5 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-amber-500 text-[var(--text-main)] transition active:scale-95">-2 gg</button>
+              <button type="button" onclick="setRefuelModalDateQuick('adesso')" class="px-1.5 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[9.5px] text-amber-400 font-semibold hover:bg-amber-500/25 transition active:scale-95" title="Imposta data e ora attuali">🕒 Adesso</button>
             </div>
           </div>
           <div class="grid grid-cols-3 gap-1.5">
-            <input type="date" id="refuelInputDate" class="col-span-2 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-amber-500">
-            <input type="time" id="refuelInputTime" class="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-amber-500">
+            <input type="date" id="refuelInputDate" onchange="updateRefuelDatePreview()" class="col-span-2 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-amber-500">
+            <input type="time" id="refuelInputTime" onchange="updateRefuelDatePreview()" class="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-amber-500">
           </div>
+          <div id="refuelDatePreviewLabel" class="text-[10px] text-amber-400 font-medium pt-0.5">🕒 Transazione: Oggi alle ...</div>
         </div>
 
         <div>
@@ -1186,10 +1189,11 @@
           <span class="text-[var(--text-muted)]">Stato Scanner:</span>
           <span id="cameraSensorLabel" class="font-bold text-emerald-400">Sensore Ottico Attivo</span>
         </div>
-        <div id="cameraResultPills" class="hidden flex gap-1.5 pt-1 text-[10px]">
+        <div id="cameraResultPills" class="hidden flex flex-wrap gap-1.5 pt-1 text-[10px]">
           <span class="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 font-mono font-bold" id="camPillTot">€ 0,00</span>
           <span class="px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-400 font-mono font-bold" id="camPillLit">0.00 L</span>
           <span class="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold" id="camPillPrice">0.000 €/L</span>
+          <span class="px-2 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 font-mono font-bold" id="camPillDate">📅 Data & Ora</span>
         </div>
       </div>
 
@@ -1227,19 +1231,22 @@
       </button>
 
       <div class="space-y-2 text-xs">
-        <!-- Selezione Data & Ora Viaggio -->
+        <!-- Selezione Data & Ora Viaggio Perfezionata -->
         <div class="space-y-1">
           <div class="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
-            <label class="font-semibold text-[var(--text-main)] flex items-center gap-1">📅 Data del Viaggio</label>
-            <div class="flex gap-1">
-              <button type="button" onclick="setTripModalDateQuick('oggi')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-blue-500 text-[var(--text-main)]">Oggi</button>
-              <button type="button" onclick="setTripModalDateQuick('ieri')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-blue-500 text-[var(--text-main)]">Ieri</button>
+            <label class="font-semibold text-[var(--text-main)] flex items-center gap-1">📅 Data e Ora del Viaggio</label>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="setTripModalDateQuick('oggi')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-blue-500 text-[var(--text-main)] transition active:scale-95">Oggi</button>
+              <button type="button" onclick="setTripModalDateQuick('ieri')" class="px-2 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-blue-500 text-[var(--text-main)] transition active:scale-95">Ieri</button>
+              <button type="button" onclick="setTripModalDateQuick('altroieri')" class="px-1.5 py-0.5 rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] text-[9.5px] hover:border-blue-500 text-[var(--text-main)] transition active:scale-95">-2 gg</button>
+              <button type="button" onclick="setTripModalDateQuick('adesso')" class="px-1.5 py-0.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-[9.5px] text-blue-400 font-semibold hover:bg-blue-500/25 transition active:scale-95" title="Imposta data e ora attuali">🕒 Adesso</button>
             </div>
           </div>
           <div class="grid grid-cols-3 gap-1.5">
-            <input type="date" id="tripInputDate" class="col-span-2 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500">
-            <input type="time" id="tripInputTime" class="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500">
+            <input type="date" id="tripInputDate" onchange="updateTripDatePreview()" class="col-span-2 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500">
+            <input type="time" id="tripInputTime" onchange="updateTripDatePreview()" class="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-500">
           </div>
+          <div id="tripDatePreviewLabel" class="text-[10px] text-blue-400 font-medium pt-0.5">🕒 Tratta: Oggi alle ...</div>
         </div>
 
         <div>

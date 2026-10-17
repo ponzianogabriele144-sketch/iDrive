@@ -67,21 +67,147 @@ const DEFAULT_CARS = [
   }
 ];
 
-let appCars = loadCars();
-let activeCarIndex = 0;
-let editingCarIndex = 0;
-let activeTab = 'dashboard';
-let chartMode = 'single'; // 'single' o 'all'
-let isDarkMode = localStorage.getItem(THEME_KEY) !== 'light';
-let btSession = { active: false, carIndex: 0, startTime: null, sec: 0, km: 0.0, interval: null };
+// ==================== COSTANTI MESE & HELPER DATA SISTEMA ====================
+const IT_MONTH_NAMES = [
+  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+];
+const IT_MONTH_SHORT = [
+  'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
+  'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
+];
 
-// GPS Tracking
-let liveTracking = {
-  active: false,
-  timer: null,
-  seconds: 0,
-  km: 0.0
-};
+function getSystemDateKey(d) {
+  const dt = d || new Date();
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getSystemTimeKey(d) {
+  const dt = d || new Date();
+  const hh = String(dt.getHours()).padStart(2, '0');
+  const mm = String(dt.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+// Normalizza e garantisce timestamp, isoDate e orario per qualsiasi transazione
+function normalizeTransactionDate(item) {
+  if (!item) return;
+
+  if (item.timestamp && !isNaN(Number(item.timestamp))) {
+    const d = new Date(Number(item.timestamp));
+    if (!isNaN(d.getTime())) {
+      item.timestamp = d.getTime();
+      item.isoDate = item.isoDate || getSystemDateKey(d);
+      item.time = item.time || getSystemTimeKey(d);
+      return;
+    }
+  }
+
+  if (item.isoDate && typeof item.isoDate === 'string') {
+    const timeStr = (item.time && item.time.length === 5) ? item.time + ':00' : '12:00:00';
+    const d = new Date(`${item.isoDate}T${timeStr}`);
+    if (!isNaN(d.getTime())) {
+      item.timestamp = d.getTime();
+      item.time = item.time || getSystemTimeKey(d);
+      return;
+    }
+  }
+
+  // Fallback se ha solo una data testuale legacy (es. "Oggi, 14:30", "Ieri", "14 Ott")
+  const dateStr = (item.date || '').trim();
+  let d = new Date();
+  if (dateStr.toLowerCase().startsWith('ieri')) {
+    d.setDate(d.getDate() - 1);
+  } else if (dateStr.toLowerCase().startsWith("l'altro ieri") || dateStr.toLowerCase().startsWith("altro ieri")) {
+    d.setDate(d.getDate() - 2);
+  } else if (!dateStr.toLowerCase().startsWith('oggi')) {
+    const parsed = Date.parse(dateStr);
+    if (!isNaN(parsed)) d = new Date(parsed);
+  }
+
+  const timeMatch = dateStr.match(/(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    d.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+  }
+
+  item.timestamp = d.getTime();
+  item.isoDate = getSystemDateKey(d);
+  item.time = getSystemTimeKey(d);
+}
+
+// Calcola dinamicamente l'etichetta temporale leggibile rispetto alla data odierna
+function formatTransactionDisplayDate(item) {
+  if (!item) return 'Data sconosciuta';
+  normalizeTransactionDate(item);
+
+  const itemDate = new Date(item.timestamp);
+  if (isNaN(itemDate.getTime())) return item.date || 'Data non valida';
+
+  const now = new Date();
+  const todayKey = getSystemDateKey(now);
+  const itemKey = getSystemDateKey(itemDate);
+
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yesterdayKey = getSystemDateKey(yesterday);
+
+  const dayBeforeYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+  const dayBeforeYesterdayKey = getSystemDateKey(dayBeforeYesterday);
+
+  const timeStr = item.time || getSystemTimeKey(itemDate);
+
+  if (itemKey === todayKey) {
+    return `Oggi, ${timeStr}`;
+  }
+  if (itemKey === yesterdayKey) {
+    return `Ieri, ${timeStr}`;
+  }
+  if (itemKey === dayBeforeYesterdayKey) {
+    return `L'altro ieri, ${timeStr}`;
+  }
+
+  const dayNum = itemDate.getDate();
+  const monthShort = IT_MONTH_SHORT[itemDate.getMonth()] || '';
+  if (itemDate.getFullYear() === now.getFullYear()) {
+    return `${dayNum} ${monthShort}, ${timeStr}`;
+  }
+  return `${dayNum} ${monthShort} ${itemDate.getFullYear()}, ${timeStr}`;
+}
+
+// Live preview aggiornato in tempo reale nei modali
+function updateRefuelDatePreview() {
+  const dateInput = document.getElementById('refuelInputDate');
+  const timeInput = document.getElementById('refuelInputTime');
+  const preview = document.getElementById('refuelDatePreviewLabel');
+  if (!preview) return;
+
+  const now = new Date();
+  const iso = dateInput && dateInput.value ? dateInput.value : getSystemDateKey(now);
+  const time = timeInput && timeInput.value ? timeInput.value : getSystemTimeKey(now);
+
+  const mockItem = { isoDate: iso, time: time };
+  normalizeTransactionDate(mockItem);
+  const friendly = formatTransactionDisplayDate(mockItem);
+  preview.innerHTML = `🕒 Transazione: <b class="text-amber-400 font-bold">${friendly}</b>`;
+}
+
+function updateTripDatePreview() {
+  const dateInput = document.getElementById('tripInputDate');
+  const timeInput = document.getElementById('tripInputTime');
+  const preview = document.getElementById('tripDatePreviewLabel');
+  if (!preview) return;
+
+  const now = new Date();
+  const iso = dateInput && dateInput.value ? dateInput.value : getSystemDateKey(now);
+  const time = timeInput && timeInput.value ? timeInput.value : getSystemTimeKey(now);
+
+  const mockItem = { isoDate: iso, time: time };
+  normalizeTransactionDate(mockItem);
+  const friendly = formatTransactionDisplayDate(mockItem);
+  preview.innerHTML = `🕒 Tratta: <b class="text-blue-400 font-bold">${friendly}</b>`;
+}
 
 function loadCars() {
   try {
@@ -110,19 +236,40 @@ function loadCars() {
       if (!Array.isArray(c.refuels)) c.refuels = [];
       if (!Array.isArray(c.historyMonths)) c.historyMonths = [0, 0, 0, 0, 0, 0];
 
-      // Assicura che ogni rifornimento e viaggio abbia un ID univoco e immutabile
+      // Assicura che ogni rifornimento e viaggio abbia un ID univoco e immutabile e date normalizzate
       c.refuels.forEach((r, rIdx) => {
         if (!r.id) r.id = 'ref_' + (Date.now() - rIdx * 1000) + '_' + rIdx;
+        normalizeTransactionDate(r);
       });
+      c.refuels.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
       c.trips.forEach((t, tIdx) => {
         if (!t.id) t.id = 'trip_' + (Date.now() - tIdx * 1000) + '_' + tIdx;
+        normalizeTransactionDate(t);
       });
+      c.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     });
     return cars;
   } catch (e) {
     return JSON.parse(JSON.stringify(DEFAULT_CARS));
   }
 }
+
+let appCars = loadCars();
+let activeCarIndex = 0;
+let editingCarIndex = 0;
+let activeTab = 'dashboard';
+let chartMode = 'single'; // 'single' o 'all'
+let isDarkMode = localStorage.getItem(THEME_KEY) !== 'light';
+let btSession = { active: false, carIndex: 0, startTime: null, sec: 0, km: 0.0, interval: null };
+
+// GPS Tracking
+let liveTracking = {
+  active: false,
+  timer: null,
+  seconds: 0,
+  km: 0.0
+};
 
 function saveCars() {
   try {
@@ -1091,9 +1238,18 @@ function renderFeed(car) {
   currentlyOpenSwipeCard = null;
 
   const items = [
-    ...car.refuels.map((r, idx) => ({ ...r, streamType: 'refuel', id: r.id || ('ref_' + idx) })),
-    ...car.trips.map((t, idx) => ({ ...t, streamType: 'trip', id: t.id || ('trip_' + idx) }))
+    ...car.refuels.map((r, idx) => {
+      normalizeTransactionDate(r);
+      return { ...r, streamType: 'refuel', id: r.id || ('ref_' + idx) };
+    }),
+    ...car.trips.map((t, idx) => {
+      normalizeTransactionDate(t);
+      return { ...t, streamType: 'trip', id: t.id || ('trip_' + idx) };
+    })
   ];
+
+  // Ordinamento cronologico decrescente garantito
+  items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
   if (items.length === 0) {
     container.innerHTML = `
@@ -1106,6 +1262,7 @@ function renderFeed(car) {
   }
 
   items.slice(0, 6).forEach(item => {
+    const displayDate = formatTransactionDisplayDate(item);
     const wrapper = document.createElement('div');
     wrapper.className = "feed-swipe-wrapper relative overflow-hidden rounded-2xl select-none group touch-pan-y shadow-sm";
     wrapper.setAttribute('data-id', item.id);
@@ -1131,7 +1288,7 @@ function renderFeed(car) {
           <div class="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center font-bold text-xs">⛽</div>
           <div>
             <div class="font-semibold text-[var(--text-main)] text-xs">Pieno (${item.liters} L)</div>
-            <div class="text-[11px] text-[var(--text-muted)]">${item.date} • ${Number(item.odometer || 0).toLocaleString('it-IT')} km</div>
+            <div class="text-[11px] text-[var(--text-muted)]">${displayDate} • ${Number(item.odometer || 0).toLocaleString('it-IT')} km</div>
           </div>
         </div>
         <div class="text-right pointer-events-none flex items-center gap-1.5">
@@ -1148,7 +1305,7 @@ function renderFeed(car) {
           <div class="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-500 flex items-center justify-center font-bold text-xs">🛣️</div>
           <div>
             <div class="font-semibold text-[var(--text-main)] text-xs truncate max-w-[160px]">${item.title}</div>
-            <div class="text-[11px] text-[var(--text-muted)]">${item.date} • ${item.durationMinutes} min</div>
+            <div class="text-[11px] text-[var(--text-muted)]">${displayDate} • ${item.durationMinutes} min</div>
           </div>
         </div>
         <div class="text-right pointer-events-none flex items-center gap-1.5">
@@ -1356,7 +1513,12 @@ function renderRefuels(car) {
     return;
   }
 
+  // Ordinamento cronologico garantito
+  car.refuels.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
   car.refuels.forEach((r, idx) => {
+    normalizeTransactionDate(r);
+    const displayDate = formatTransactionDisplayDate(r);
     const rId = r.id || ('ref_' + idx);
     const wrapper = document.createElement('div');
     wrapper.className = "feed-swipe-wrapper relative overflow-hidden rounded-2xl select-none group touch-pan-y shadow-sm";
@@ -1374,7 +1536,7 @@ function renderRefuels(car) {
     cardContent.className = "feed-swipe-card relative z-10 p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm space-y-1.5 text-xs will-change-transform cursor-grab active:cursor-grabbing";
     cardContent.innerHTML = `
       <div class="flex justify-between items-start font-bold">
-        <span class="text-[var(--text-main)]">${r.date} • ${Number(r.odometer || 0).toLocaleString('it-IT')} km</span>
+        <span class="text-[var(--text-main)]">${displayDate} • ${Number(r.odometer || 0).toLocaleString('it-IT')} km</span>
         <div class="flex items-center gap-2">
           <span class="text-amber-500 font-mono">€ ${Number(r.totalCost || 0).toFixed(2).replace('.', ',')}</span>
           <button onclick="event.stopPropagation(); deleteRefuel('${rId}')" title="Elimina Rifornimento" class="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 border border-transparent hover:border-rose-500/30 transition active:scale-95">
@@ -1426,7 +1588,12 @@ function renderTrips(car) {
     return;
   }
 
+  // Ordinamento cronologico garantito
+  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
   car.trips.forEach((t, idx) => {
+    normalizeTransactionDate(t);
+    const displayDate = formatTransactionDisplayDate(t);
     const tId = t.id || ('trip_' + idx);
     const kmNum = parseFloat(t.km) || 0;
     const costNum = parseFloat(t.cost) || 0;
@@ -1462,7 +1629,7 @@ function renderTrips(car) {
             <span class="text-xs font-black text-[var(--text-main)]">${t.title}</span>
           </div>
           <div class="text-[10.5px] text-[var(--text-muted)] flex items-center gap-1.5 pl-6">
-            <span>📅 ${t.date}</span>
+            <span>📅 ${displayDate}</span>
             <span>•</span>
             <span>⏱️ ${durNum} min (~${avgSpeed} km/h)</span>
           </div>
@@ -1568,6 +1735,13 @@ function repeatTrip(tripIdx) {
   openModal('modalTrip');
   document.getElementById('tripInputTitle').value = t.title;
   document.getElementById('tripInputKm').value = t.km;
+  // Assicura che la tratta ripetuta catturi data e ora attuali
+  const now = new Date();
+  const dateIn = document.getElementById('tripInputDate');
+  const timeIn = document.getElementById('tripInputTime');
+  if (dateIn) dateIn.value = getSystemDateKey(now);
+  if (timeIn) timeIn.value = getSystemTimeKey(now);
+  updateTripDatePreview();
   updateTripModalEstimates();
 }
 
@@ -1813,16 +1987,26 @@ function triggerBtDisconnect() {
   const userCons = car.consumption || defaultCons;
   const costTrip = (doneKm * userCons / 100) * 1.78;
 
-  // Salva viaggio nel diario
+  // Salva viaggio nel diario con cattura esatta di data e ora
+  const now = new Date();
+  const isoDate = getSystemDateKey(now);
+  const timeStr = getSystemTimeKey(now);
+  const timestamp = now.getTime();
+  const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
+
   car.currentOdo += Math.round(doneKm);
   car.trips.unshift({
     id: `trip_bt_${Date.now()}`,
     title: `Tratta Auto-Start (${car.btDevice})`,
-    date: "Oggi",
+    date: dateLabel,
+    isoDate,
+    time: timeStr,
+    timestamp,
     km: doneKm,
     durationMinutes: minutes,
     cost: parseFloat(costTrip.toFixed(2))
   });
+  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
   saveCars();
 
@@ -1891,15 +2075,6 @@ function switchTab(tab) {
 }
 
 // ==================== CALENDARIO SINCRONIZZATO IN TEMPO REALE ====================
-const IT_MONTH_NAMES = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
-];
-const IT_MONTH_SHORT = [
-  'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
-  'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'
-];
-
 let calendarNow = new Date();
 let calendarViewYear = calendarNow.getFullYear();
 let calendarViewMonth = calendarNow.getMonth(); // 0-11
@@ -1907,19 +2082,11 @@ let calendarSelectedDay = calendarNow.getDate();
 let lastKnownSystemDateString = getSystemDateKey(calendarNow);
 let midnightSyncTimer = null;
 
-function getSystemDateKey(d) {
-  const dt = d || new Date();
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, '0');
-  const day = String(dt.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 // Verifica se un'attività (pieno o viaggio) corrisponde alla data selezionata
 function isActivityOnCalendarDate(activity, targetYear, targetMonth, targetDay) {
   if (!activity) return false;
+  normalizeTransactionDate(activity);
 
-  // 1. Confronto via timestamp numerico esatto se disponibile
   if (activity.timestamp) {
     const actDate = new Date(activity.timestamp);
     if (!isNaN(actDate.getTime())) {
@@ -1929,7 +2096,6 @@ function isActivityOnCalendarDate(activity, targetYear, targetMonth, targetDay) 
     }
   }
 
-  // 2. Confronto via stringa ISO YYYY-MM-DD
   if (activity.isoDate) {
     const parts = activity.isoDate.split('-');
     if (parts.length === 3) {
@@ -1938,35 +2104,6 @@ function isActivityOnCalendarDate(activity, targetYear, targetMonth, targetDay) 
       const d = parseInt(parts[2], 10);
       return y === targetYear && m === targetMonth && d === targetDay;
     }
-  }
-
-  // 3. Confronto con etichette flessibili relative ("Oggi", "Ieri") o storiche ("14 Ott")
-  const dateStr = (activity.date || '').trim();
-  const now = new Date();
-
-  if (dateStr.toLowerCase().startsWith('oggi')) {
-    return targetYear === now.getFullYear() &&
-           targetMonth === now.getMonth() &&
-           targetDay === now.getDate();
-  }
-
-  if (dateStr.toLowerCase().startsWith('ieri')) {
-    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    return targetYear === yesterday.getFullYear() &&
-           targetMonth === yesterday.getMonth() &&
-           targetDay === yesterday.getDate();
-  }
-
-  // Ricerca corrispondenza mese abbreviato (es. "15 Ott", "12 Nov")
-  const shortMonth = IT_MONTH_SHORT[targetMonth];
-  const dayP1 = `${targetDay} ${shortMonth}`;
-  const dayP2 = `${String(targetDay).padStart(2, '0')} ${shortMonth}`;
-  if (dateStr.includes(dayP1) || dateStr.includes(dayP2)) {
-    const yearMatch = dateStr.match(/\b(20\d\d)\b/);
-    if (yearMatch) {
-      return parseInt(yearMatch[1], 10) === targetYear;
-    }
-    return targetYear === now.getFullYear();
   }
 
   return false;
@@ -2370,7 +2507,7 @@ function openModal(id) {
   const car = appCars[activeCarIndex];
   const now = new Date();
   const currentIso = getSystemDateKey(now);
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const currentTime = getSystemTimeKey(now);
 
   if (id === 'modalRefuel') {
     document.getElementById('refuelInputKm').value = car.currentOdo > 0 ? car.currentOdo : '';
@@ -2383,8 +2520,12 @@ function openModal(id) {
     
     const rDate = document.getElementById('refuelInputDate');
     const rTime = document.getElementById('refuelInputTime');
-    if (rDate) rDate.value = currentIso;
+    if (rDate) {
+      rDate.value = currentIso;
+      rDate.max = currentIso;
+    }
     if (rTime) rTime.value = currentTime;
+    updateRefuelDatePreview();
 
   } else if (id === 'modalTrip') {
     document.getElementById('tripInputTitle').value = '';
@@ -2394,9 +2535,13 @@ function openModal(id) {
     
     const tDate = document.getElementById('tripInputDate');
     const tTime = document.getElementById('tripInputTime');
-    if (tDate) tDate.value = currentIso;
+    if (tDate) {
+      tDate.value = currentIso;
+      tDate.max = currentIso;
+    }
     if (tTime) tTime.value = currentTime;
 
+    updateTripDatePreview();
     updateTripModalEstimates();
   } else if (id === 'modalPdfReport') {
     renderPdfReport();
@@ -2414,34 +2559,54 @@ function openModalWithDate(modalId, year, month, day) {
   if (modalId === 'modalTrip') {
     const elDate = document.getElementById('tripInputDate');
     if (elDate) elDate.value = isoStr;
+    updateTripDatePreview();
   } else if (modalId === 'modalRefuel') {
     const elDate = document.getElementById('refuelInputDate');
     if (elDate) elDate.value = isoStr;
+    updateRefuelDatePreview();
   }
 }
 
 function setTripModalDateQuick(type) {
   const now = new Date();
-  const input = document.getElementById('tripInputDate');
-  if (!input) return;
+  const dateInput = document.getElementById('tripInputDate');
+  const timeInput = document.getElementById('tripInputTime');
+  if (!dateInput) return;
+
   if (type === 'oggi') {
-    input.value = getSystemDateKey(now);
+    dateInput.value = getSystemDateKey(now);
   } else if (type === 'ieri') {
     const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    input.value = getSystemDateKey(y);
+    dateInput.value = getSystemDateKey(y);
+  } else if (type === 'altroieri') {
+    const ay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+    dateInput.value = getSystemDateKey(ay);
+  } else if (type === 'adesso') {
+    dateInput.value = getSystemDateKey(now);
+    if (timeInput) timeInput.value = getSystemTimeKey(now);
   }
+  updateTripDatePreview();
 }
 
 function setRefuelModalDateQuick(type) {
   const now = new Date();
-  const input = document.getElementById('refuelInputDate');
-  if (!input) return;
+  const dateInput = document.getElementById('refuelInputDate');
+  const timeInput = document.getElementById('refuelInputTime');
+  if (!dateInput) return;
+
   if (type === 'oggi') {
-    input.value = getSystemDateKey(now);
+    dateInput.value = getSystemDateKey(now);
   } else if (type === 'ieri') {
     const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-    input.value = getSystemDateKey(y);
+    dateInput.value = getSystemDateKey(y);
+  } else if (type === 'altroieri') {
+    const ay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2);
+    dateInput.value = getSystemDateKey(ay);
+  } else if (type === 'adesso') {
+    dateInput.value = getSystemDateKey(now);
+    if (timeInput) timeInput.value = getSystemTimeKey(now);
   }
+  updateRefuelDatePreview();
 }
 
 function closeModal(id) {
@@ -2649,12 +2814,20 @@ function runReceiptAnalysisAnimation() {
       const totalAmount = (car.fuelType === 'Ibrida' ? 54.27 : (isPetrol ? 58.20 : 88.80));
       const liters = parseFloat((totalAmount / pricePerL).toFixed(2));
 
+      // Cattura data e ora esatte dello scontrino
+      const scannedDate = new Date();
+      const scannedIso = getSystemDateKey(scannedDate);
+      const scannedTime = getSystemTimeKey(scannedDate);
+
       const pillTot = document.getElementById('camPillTot');
       const pillLit = document.getElementById('camPillLit');
       const pillPrice = document.getElementById('camPillPrice');
+      const pillDate = document.getElementById('camPillDate');
+
       if (pillTot) pillTot.innerText = '€ ' + totalAmount.toFixed(2).replace('.', ',');
       if (pillLit) pillLit.innerText = liters + ' L';
       if (pillPrice) pillPrice.innerText = pricePerL.toFixed(3) + ' €/L';
+      if (pillDate) pillDate.innerText = `📅 ${scannedDate.getDate()}/${scannedDate.getMonth() + 1} ${scannedTime}`;
       if (resultPills) resultPills.classList.remove('hidden');
 
       if (sensorLabel) {
@@ -2666,22 +2839,28 @@ function runReceiptAnalysisAnimation() {
       const litIn = document.getElementById('refuelInputLiters');
       const prcIn = document.getElementById('refuelInputPricePerL');
       const totIn = document.getElementById('refuelInputTotal');
+      const dateIn = document.getElementById('refuelInputDate');
+      const timeIn = document.getElementById('refuelInputTime');
 
       if (odoIn) odoIn.value = car.currentOdo + Math.floor(Math.random() * 50 + 550);
       if (litIn) litIn.value = liters.toFixed(2);
       if (prcIn) prcIn.value = pricePerL.toFixed(3);
       if (totIn) totIn.value = totalAmount.toFixed(2);
+      if (dateIn) dateIn.value = scannedIso;
+      if (timeIn) timeIn.value = scannedTime;
 
       setTimeout(() => {
         closeCameraScanner();
         openModal('modalRefuel');
+        updateRefuelDatePreview();
         if (btnSnap) btnSnap.disabled = false;
 
         const banner = document.getElementById('iosNotificationBanner');
         const msg = document.getElementById('notifBannerMessage');
         if (banner && msg) {
-          msg.innerHTML = `📸 <b>Scontrino Analizzato:</b> Rilevati <b>${liters} L</b> a <b>${pricePerL.toFixed(3)} €/L</b> (Totale: <b>€ ${totalAmount.toFixed(2).replace('.', ',')}</b>). Controlla e premi Salva.`;
+          msg.innerHTML = `📸 <b>Scontrino Analizzato:</b> Rilevati <b>${liters} L</b> a <b>${pricePerL.toFixed(3)} €/L</b> (Tot: <b>€ ${totalAmount.toFixed(2).replace('.', ',')}</b>) in data <b>${scannedDate.toLocaleDateString('it-IT')} ${scannedTime}</b>.`;
           banner.classList.remove('hidden');
+          setTimeout(() => banner.classList.add('hidden'), 5000);
         }
       }, 900);
     }, 700);
@@ -2695,33 +2874,23 @@ function saveRefuelFromModal() {
   const p = parseFloat(document.getElementById('refuelInputPricePerL').value) || 0;
   const tot = parseFloat(document.getElementById('refuelInputTotal').value) || (l * p);
 
-  // Lettura data e ora selezionate dall'utente
+  // Lettura e cattura accurata di data e ora
   const dateInput = document.getElementById('refuelInputDate');
   const timeInput = document.getElementById('refuelInputTime');
   const now = new Date();
 
   let isoDate = dateInput && dateInput.value ? dateInput.value : getSystemDateKey(now);
-  let timeStr = timeInput && timeInput.value ? timeInput.value : `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  let timeStr = timeInput && timeInput.value ? timeInput.value : getSystemTimeKey(now);
 
   let refuelDateObj = new Date(isoDate + 'T' + (timeStr.length === 5 ? timeStr + ':00' : '12:00:00'));
   if (isNaN(refuelDateObj.getTime())) {
     refuelDateObj = new Date();
     isoDate = getSystemDateKey(refuelDateObj);
+    timeStr = getSystemTimeKey(refuelDateObj);
   }
 
-  const isToday = getSystemDateKey(refuelDateObj) === getSystemDateKey(now);
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const isYesterday = getSystemDateKey(refuelDateObj) === getSystemDateKey(yesterday);
-
-  let dateLabel = '';
-  if (isToday) {
-    dateLabel = `Oggi, ${timeStr}`;
-  } else if (isYesterday) {
-    dateLabel = `Ieri, ${timeStr}`;
-  } else {
-    const itShort = IT_MONTH_SHORT[refuelDateObj.getMonth()] || '';
-    dateLabel = `${refuelDateObj.getDate()} ${itShort} ${refuelDateObj.getFullYear()}, ${timeStr}`;
-  }
+  const timestamp = refuelDateObj.getTime();
+  const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
 
   car.currentOdo = Math.max(km, car.currentOdo);
   car.refuels.unshift({
@@ -2729,14 +2898,17 @@ function saveRefuelFromModal() {
     date: dateLabel,
     isoDate,
     time: timeStr,
-    timestamp: refuelDateObj.getTime(),
+    timestamp,
     odometer: km,
     liters: l,
     pricePerLiter: p,
     totalCost: tot,
     isFull: true,
-    station: "Rifornimento Diretto"
+    station: "Rifornimento Carburante"
   });
+
+  // Ordinamento cronologico garantito
+  car.refuels.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
   const currMonthTotal = car.refuels.reduce((sum, r) => sum + (parseFloat(r.totalCost) || 0), 0);
   if (Array.isArray(car.historyMonths) && car.historyMonths.length > 5) {
@@ -2746,6 +2918,15 @@ function saveRefuelFromModal() {
   saveCars();
   closeModal('modalRefuel');
   renderAll();
+
+  // Notifica di conferma stile iOS
+  const banner = document.getElementById('iosNotificationBanner');
+  const msg = document.getElementById('notifBannerMessage');
+  if (banner && msg) {
+    msg.innerHTML = `⛽ <b>Rifornimento Registrato:</b> ${l} L (${dateLabel}) salvati per <b>${car.name}</b>.`;
+    banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 4500);
+  }
 }
 
 function updateTripModalEstimates() {
@@ -2763,33 +2944,23 @@ function saveTripFromModal() {
   const km = parseFloat(document.getElementById('tripInputKm').value) || 0;
   const dur = parseInt(document.getElementById('tripInputDuration').value) || 30;
 
-  // Lettura data e ora selezionate dall'utente
+  // Lettura e cattura accurata di data e ora
   const dateInput = document.getElementById('tripInputDate');
   const timeInput = document.getElementById('tripInputTime');
   const now = new Date();
 
   let isoDate = dateInput && dateInput.value ? dateInput.value : getSystemDateKey(now);
-  let timeStr = timeInput && timeInput.value ? timeInput.value : `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  let timeStr = timeInput && timeInput.value ? timeInput.value : getSystemTimeKey(now);
 
   let tripDateObj = new Date(isoDate + 'T' + (timeStr.length === 5 ? timeStr + ':00' : '12:00:00'));
   if (isNaN(tripDateObj.getTime())) {
     tripDateObj = new Date();
     isoDate = getSystemDateKey(tripDateObj);
+    timeStr = getSystemTimeKey(tripDateObj);
   }
 
-  const isToday = getSystemDateKey(tripDateObj) === getSystemDateKey(now);
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const isYesterday = getSystemDateKey(tripDateObj) === getSystemDateKey(yesterday);
-
-  let dateLabel = '';
-  if (isToday) {
-    dateLabel = `Oggi, ${timeStr}`;
-  } else if (isYesterday) {
-    dateLabel = `Ieri, ${timeStr}`;
-  } else {
-    const itShort = IT_MONTH_SHORT[tripDateObj.getMonth()] || '';
-    dateLabel = `${tripDateObj.getDate()} ${itShort} ${tripDateObj.getFullYear()}, ${timeStr}`;
-  }
+  const timestamp = tripDateObj.getTime();
+  const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
 
   const userCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
   const fuelPrice = car.refuels.length > 0 && car.refuels[0].pricePerLiter ? parseFloat(car.refuels[0].pricePerLiter) : (car.fuelType === 'Benzina' ? 1.819 : (car.fuelType === 'Ibrida' ? 1.809 : 1.759));
@@ -2802,15 +2973,27 @@ function saveTripFromModal() {
     date: dateLabel,
     isoDate,
     time: timeStr,
-    timestamp: tripDateObj.getTime(),
+    timestamp,
     km,
     durationMinutes: dur,
     cost: parseFloat(cost.toFixed(2))
   });
 
+  // Ordinamento cronologico garantito
+  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
   saveCars();
   closeModal('modalTrip');
   renderAll();
+
+  // Notifica di conferma stile iOS
+  const banner = document.getElementById('iosNotificationBanner');
+  const msg = document.getElementById('notifBannerMessage');
+  if (banner && msg) {
+    msg.innerHTML = `🛣️ <b>Viaggio Registrato:</b> ${km} km (${dateLabel}) salvati per <b>${car.name}</b>.`;
+    banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 4500);
+  }
 }
 
 // GPS Tracking Simulato
@@ -2852,15 +3035,27 @@ function stopGpsLive() {
     const userCons = car.consumption || defaultCons;
     const costTrip = (doneKm * userCons / 100) * 1.78;
 
+    // Cattura esatta di data e ora al termine del tragitto
+    const now = new Date();
+    const isoDate = getSystemDateKey(now);
+    const timeStr = getSystemTimeKey(now);
+    const timestamp = now.getTime();
+    const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
+
     car.currentOdo += Math.round(doneKm);
     car.trips.unshift({
       id: 'trip_' + Date.now(),
       title: 'Percorso GPS Tracciato',
-      date: 'Oggi',
+      date: dateLabel,
+      isoDate,
+      time: timeStr,
+      timestamp,
       km: doneKm,
       durationMinutes: Math.max(1, Math.round(liveTracking.seconds / 60)),
       cost: parseFloat(costTrip.toFixed(2))
     });
+    car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
     saveCars();
     renderAll();
   }
