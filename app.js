@@ -1255,21 +1255,24 @@ function renderAll() {
   const kpiL = document.getElementById('kpiLiters100');
   if (kpiL) kpiL.innerText = secEff;
 
-  // Calcolo Durata in Ore di Guida (sostituisce il Costo Vivo in basso a destra nella prima pagina)
-  const totalDriveMinutes = (car.trips || []).reduce((acc, t) => acc + (parseFloat(t.durationMinutes) || 0), 0);
-  const totalDriveHours = totalDriveMinutes / 60;
+  // Calcolo Durata in Ore di Guida del MESE CORRENTE (riparte da 0,0 h ogni 1° del mese)
+  const currentMonthTrips = (car.trips || []).filter(t => isTransactionInCurrentMonth(t, now));
+  const currentMonthDriveMinutes = currentMonthTrips.reduce((acc, t) => acc + (parseFloat(t.durationMinutes) || 0), 0);
+  const currentMonthDriveHours = currentMonthDriveMinutes / 60;
   const kpiDriveH = document.getElementById('kpiDriveHours');
   const kpiDriveHSub = document.getElementById('kpiDriveHoursSub');
   if (kpiDriveH) {
-    kpiDriveH.innerText = totalDriveHours.toFixed(1).replace('.', ',') + ' h';
+    kpiDriveH.innerText = currentMonthDriveHours.toFixed(1).replace('.', ',') + ' h';
   }
   if (kpiDriveHSub) {
-    if (totalDriveMinutes > 0) {
-      const hInt = Math.floor(totalDriveMinutes / 60);
-      const mRem = Math.round(totalDriveMinutes % 60);
-      kpiDriveHSub.innerText = hInt > 0 ? `${hInt}h ${mRem}m (${Math.round(totalDriveMinutes)} min)` : `${Math.round(totalDriveMinutes)} min totali`;
+    if (currentMonthDriveMinutes > 0) {
+      const hInt = Math.floor(currentMonthDriveMinutes / 60);
+      const mRem = Math.round(currentMonthDriveMinutes % 60);
+      kpiDriveHSub.innerText = hInt > 0 
+        ? `${hInt}h ${mRem}m (${IT_MONTH_SHORT[now.getMonth()]})` 
+        : `${Math.round(currentMonthDriveMinutes)} min (${IT_MONTH_SHORT[now.getMonth()]})`;
     } else {
-      kpiDriveHSub.innerText = 'Durata totale guida';
+      kpiDriveHSub.innerText = `Mese di ${IT_MONTH_NAMES[now.getMonth()]}`;
     }
   }
 
@@ -2245,14 +2248,14 @@ function setCalendarMonth(monthIndex) {
   renderCalendar();
 }
 
-// Calcolo e rendering riassunto statistico del mese selezionato
+// Calcolo e rendering riassunto statistico del mese selezionato (mese per mese)
 function renderCalendarMonthStats() {
   const box = document.getElementById('calendarMonthStatsBox');
   if (!box) return;
 
   const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
   let totCost = 0;
-  let totLiters = 0;
+  let totDriveMinutes = 0;
   let totKm = 0;
   let eventCount = 0;
 
@@ -2261,7 +2264,6 @@ function renderCalendarMonthStats() {
       (car.refuels || []).forEach(r => {
         if (isActivityOnCalendarDate(r, calendarViewYear, calendarViewMonth, d)) {
           totCost += parseFloat(r.totalCost) || 0;
-          totLiters += parseFloat(r.liters) || 0;
           eventCount++;
         }
       });
@@ -2269,20 +2271,24 @@ function renderCalendarMonthStats() {
         if (isActivityOnCalendarDate(t, calendarViewYear, calendarViewMonth, d)) {
           totKm += parseFloat(t.km) || 0;
           totCost += parseFloat(t.cost) || 0;
+          totDriveMinutes += parseFloat(t.durationMinutes) || 0;
           eventCount++;
         }
       });
     });
   }
 
+  const totHours = totDriveMinutes / 60;
+  const hoursFormatted = totHours.toFixed(1).replace('.', ',') + ' h';
+
   box.innerHTML = `
     <div class="p-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]">
       <div class="text-[9px] text-[var(--text-muted)]">⛽ Spesa Mese</div>
       <div class="text-[11px] font-bold text-amber-500 font-mono mt-0.5">€ ${totCost.toFixed(2).replace('.', ',')}</div>
     </div>
-    <div class="p-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]">
-      <div class="text-[9px] text-[var(--text-muted)]">💧 Litri Pieni</div>
-      <div class="text-[11px] font-bold text-[var(--text-main)] font-mono mt-0.5">${totLiters.toFixed(1)} L</div>
+    <div class="p-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]" title="Ore di Guida nel Mese">
+      <div class="text-[9px] text-[var(--text-muted)]">⏱️ Ore Guida</div>
+      <div class="text-[11px] font-bold text-purple-400 font-mono mt-0.5">${hoursFormatted}</div>
     </div>
     <div class="p-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)]">
       <div class="text-[9px] text-[var(--text-muted)]">🛣️ Km Tratte</div>
@@ -2544,12 +2550,16 @@ function initCalendarSystemClockSync() {
     const currentKey = getSystemDateKey(currentNow);
 
     if (currentKey !== lastKnownSystemDateString) {
+      const prevDate = new Date(calendarNow.getTime());
+      const wasViewingCurrent = (calendarViewYear === prevDate.getFullYear() && calendarViewMonth === prevDate.getMonth());
+
       lastKnownSystemDateString = currentKey;
       calendarNow = currentNow;
 
-      // Se eravamo nel mese corrente o in quello precedente, aggiorna la vista a oggi
-      const wasViewingCurrent = (calendarViewYear === currentNow.getFullYear() && calendarViewMonth === currentNow.getMonth());
+      // Se eravamo nel mese corrente, aggiorna la vista al nuovo mese corrente e seleziona il nuovo giorno (es. 1 del mese)
       if (wasViewingCurrent) {
+        calendarViewYear = currentNow.getFullYear();
+        calendarViewMonth = currentNow.getMonth();
         calendarSelectedDay = currentNow.getDate();
       }
 
