@@ -209,6 +209,63 @@ function updateTripDatePreview() {
   preview.innerHTML = `🕒 Tratta: <b class="text-blue-400 font-bold">${friendly}</b>`;
 }
 
+// Verifica se una transazione cade in uno specifico anno e mese (month: 0-11)
+function isTransactionInYearMonth(item, year, month) {
+  if (!item) return false;
+  normalizeTransactionDate(item);
+  if (item.timestamp) {
+    const d = new Date(item.timestamp);
+    if (!isNaN(d.getTime())) {
+      return d.getFullYear() === year && d.getMonth() === month;
+    }
+  }
+  if (item.isoDate) {
+    const parts = item.isoDate.split('-');
+    if (parts.length === 3) {
+      return parseInt(parts[0], 10) === year && (parseInt(parts[1], 10) - 1) === month;
+    }
+  }
+  return false;
+}
+
+// Verifica se una transazione appartiene al mese corrente (ogni 1° del mese il filtro passa al nuovo mese)
+function isTransactionInCurrentMonth(item, refDate) {
+  const now = refDate || new Date();
+  return isTransactionInYearMonth(item, now.getFullYear(), now.getMonth());
+}
+
+// Restituisce i metadati degli ultimi 6 mesi fino al mese corrente (indice 5 = mese corrente)
+function getLastSixMonthsMeta(refDate) {
+  const now = refDate || new Date();
+  const result = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    result.push({
+      year: y,
+      month: m,
+      shortName: IT_MONTH_SHORT[m],
+      fullName: IT_MONTH_NAMES[m]
+    });
+  }
+  return result;
+}
+
+// Sincronizza dinamicamente lo storico a 6 mesi dell'auto: ogni 1° del mese l'indice 5 (mese corrente) riparte da 0
+function syncCarHistoryMonths(car, refDate) {
+  if (!car) return [0, 0, 0, 0, 0, 0];
+  const meta = getLastSixMonthsMeta(refDate);
+  const refuels = Array.isArray(car.refuels) ? car.refuels : [];
+  car.historyMonths = meta.map(slot => {
+    const sum = refuels
+      .filter(r => isTransactionInYearMonth(r, slot.year, slot.month))
+      .reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
+    return parseFloat(sum.toFixed(2));
+  });
+  return car.historyMonths;
+}
+
 function loadCars() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -248,6 +305,8 @@ function loadCars() {
         normalizeTransactionDate(t);
       });
       c.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+      syncCarHistoryMonths(c);
     });
     return cars;
   } catch (e) {
@@ -301,9 +360,7 @@ function applyAppTheme(dark) {
 }
 
 // ==================== GRAFICO ANDAMENTO SPESE AD ALTA PRECISIONE & TOUCH SCRUBBER ====================
-let selectedMonthIndex = 5; // Default: Mese corrente (Ottobre = 5)
-const monthsShort = ["Mag", "Giu", "Lug", "Ago", "Set", "Ott"];
-const monthsFull = ["Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre"];
+let selectedMonthIndex = 5; // Default: Mese corrente (indice 5)
 
 function switchChartMode(mode) {
   chartMode = mode;
@@ -328,6 +385,10 @@ function drawExpenseChart() {
   const ctx = canvas.getContext('2d');
   const w = 350;
   const h = 155;
+
+  // Sincronizza i dati mensili di tutte le auto con il calendario reale
+  const monthsMeta = getLastSixMonthsMeta();
+  appCars.forEach(c => syncCarHistoryMonths(c));
 
   // Risoluzione Retina 2x
   canvas.width = w * 2;
@@ -368,17 +429,17 @@ function drawExpenseChart() {
     ctx.fillText(`€${val}`, padLeft - 6, y);
   });
 
-  // 2. Mesi su Asse X
+  // 2. Mesi su Asse X (dinamici fino al mese corrente)
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
 
-  monthsShort.forEach((m, i) => {
+  monthsMeta.forEach((mObj, i) => {
     const x = padLeft + (i / 5) * chartW;
     const isSel = (i === selectedMonthIndex);
 
     ctx.fillStyle = isSel ? (isDarkMode ? "#ffffff" : "#09090b") : "#71717a";
     ctx.font = isSel ? "bold 10px sans-serif" : "600 9px sans-serif";
-    ctx.fillText(m, x, padTop + chartH + 8);
+    ctx.fillText(mObj.shortName, x, padTop + chartH + 8);
   });
 
   // Mappatura punti
@@ -410,7 +471,7 @@ function drawExpenseChart() {
   // 3. Rendering delle Curve
   if (chartMode === 'single') {
     const car = appCars[activeCarIndex];
-    const data = car.historyMonths || [145, 160, 150, 195, 175, 218.5];
+    const data = car.historyMonths || [0, 0, 0, 0, 0, 0];
     const pts = getPoints(data);
 
     // Riempimento Sfumato sotto la curva
@@ -440,19 +501,20 @@ function drawExpenseChart() {
     });
 
   } else {
-    // Modalità comparata: Tutte e 3 le auto
-    const colors = ["#f59e0b", "#3b82f6", "#10b981"];
+    // Modalità comparata: Tutte le auto del garage
+    const colors = ["#f59e0b", "#3b82f6", "#10b981", "#f43f5e", "#0ea5e9", "#a855f7"];
     appCars.forEach((car, cIdx) => {
-      const data = car.historyMonths || [50, 60, 55, 70, 65, 80];
+      const data = car.historyMonths || [0, 0, 0, 0, 0, 0];
       const pts = getPoints(data);
+      const col = colors[cIdx % colors.length];
 
       drawSplinePath(pts);
-      ctx.strokeStyle = colors[cIdx];
+      ctx.strokeStyle = col;
       ctx.lineWidth = (cIdx === activeCarIndex ? 2.8 : 2.0);
       ctx.stroke();
 
       pts.forEach((pt, i) => {
-        ctx.fillStyle = colors[cIdx];
+        ctx.fillStyle = col;
         ctx.beginPath();
         ctx.arc(pt.x, pt.y, (i === selectedMonthIndex ? 4 : 2.5), 0, Math.PI * 2);
         ctx.fill();
@@ -476,8 +538,8 @@ function drawExpenseChart() {
   // Indicatore Halo e Valore Evidenziato
   if (chartMode === 'single') {
     const car = appCars[activeCarIndex];
-    const data = car.historyMonths || [145, 160, 150, 195, 175, 218.5];
-    const val = data[selectedMonthIndex];
+    const data = car.historyMonths || [0, 0, 0, 0, 0, 0];
+    const val = data[selectedMonthIndex] || 0;
     const selY = padTop + (1 - Math.min(val, maxVal) / maxVal) * chartH;
 
     // Halo esterno
@@ -520,14 +582,14 @@ function drawExpenseChart() {
     ctx.fillText(tagText, selX, tagY - tagH / 2);
 
   } else {
-    // Modalità 3 auto: evidenzia i 3 punti lungo lo scrubber
-    const colors = ["#f59e0b", "#3b82f6", "#10b981"];
+    // Modalità multi-auto: evidenzia i punti lungo lo scrubber
+    const colors = ["#f59e0b", "#3b82f6", "#10b981", "#f43f5e", "#0ea5e9", "#a855f7"];
     appCars.forEach((car, cIdx) => {
-      const data = car.historyMonths || [50, 60, 55, 70, 65, 80];
-      const val = data[selectedMonthIndex];
+      const data = car.historyMonths || [0, 0, 0, 0, 0, 0];
+      const val = data[selectedMonthIndex] || 0;
       const selY = padTop + (1 - Math.min(val, maxVal) / maxVal) * chartH;
 
-      ctx.fillStyle = colors[cIdx];
+      ctx.fillStyle = colors[cIdx % colors.length];
       ctx.beginPath();
       ctx.arc(selX, selY, 4.5, 0, Math.PI * 2);
       ctx.fill();
@@ -549,12 +611,15 @@ function updateChartTooltipCard() {
   const card = document.getElementById('chartTooltipCard');
   if (!card) return;
 
-  const monthName = monthsFull[selectedMonthIndex];
+  const monthsMeta = getLastSixMonthsMeta();
+  const selMeta = monthsMeta[selectedMonthIndex] || monthsMeta[5];
+  const monthName = selMeta.fullName;
+  const monthYear = selMeta.year;
 
   if (chartMode === 'single') {
     const car = appCars[activeCarIndex];
-    const data = car.historyMonths || [145, 160, 150, 195, 175, 218.5];
-    const val = data[selectedMonthIndex];
+    const data = car.historyMonths || [0, 0, 0, 0, 0, 0];
+    const val = data[selectedMonthIndex] || 0;
     const litriEst = (val / 1.769).toFixed(1);
 
     card.innerHTML = `
@@ -562,7 +627,7 @@ function updateChartTooltipCard() {
         <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
         <div>
           <div class="text-[11px] font-bold text-[var(--text-main)] flex items-center gap-1.5">
-            <span>📅 ${monthName} 2026</span>
+            <span>📅 ${monthName} ${monthYear}</span>
             <span class="text-[9px] font-semibold text-amber-500 bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/20">${car.name}</span>
           </div>
           <div class="text-[9px] text-[var(--text-muted)]">Stima carburante: ~<b>${litriEst} L</b> (${car.fuelType})</div>
@@ -574,21 +639,25 @@ function updateChartTooltipCard() {
       </div>
     `;
   } else {
-    const val0 = (appCars[0].historyMonths || [145, 160, 150, 195, 175, 218.5])[selectedMonthIndex];
-    const val1 = (appCars[1].historyMonths || [35, 42, 38, 55, 48, 58.2])[selectedMonthIndex];
-    const val2 = (appCars[2].historyMonths || [48, 52, 45, 60, 50, 54.27])[selectedMonthIndex];
-    const total = val0 + val1 + val2;
+    const dotColors = ["bg-amber-500", "bg-blue-500", "bg-emerald-500", "bg-rose-500", "bg-sky-500", "bg-purple-500"];
+    let total = 0;
+    let carsBreakdownHtml = '';
+
+    appCars.forEach((c, idx) => {
+      const cVal = (c.historyMonths || [0, 0, 0, 0, 0, 0])[selectedMonthIndex] || 0;
+      total += cVal;
+      const dotCol = dotColors[idx % dotColors.length];
+      carsBreakdownHtml += `<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full ${dotCol}"></span> ${c.name}: <b>€ ${cVal.toFixed(1)}</b></span>`;
+    });
 
     card.innerHTML = `
       <div class="w-full space-y-1">
         <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-1">
-          <span class="text-[11px] font-bold text-[var(--text-main)]">📅 ${monthName} 2026 • 3 Auto</span>
+          <span class="text-[11px] font-bold text-[var(--text-main)]">📅 ${monthName} ${monthYear} • ${appCars.length} Auto</span>
           <span class="text-xs font-black font-mono text-[var(--text-main)]">Totale: <span class="text-amber-500">€ ${total.toFixed(2).replace('.', ',')}</span></span>
         </div>
-        <div class="flex items-center justify-between text-[10px] font-mono">
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> ${appCars[0]?.name || 'Auto 1'}: <b>€ ${val0.toFixed(1)}</b></span>
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> ${appCars[1]?.name || 'Auto 2'}: <b>€ ${val1.toFixed(1)}</b></span>
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> ${appCars[2]?.name || 'Auto 3'}: <b>€ ${val2.toFixed(1)}</b></span>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
+          ${carsBreakdownHtml}
         </div>
       </div>
     `;
@@ -625,14 +694,15 @@ function initChartInteractions() {
 }
 
 // ==================== NOTIFICA ORE 8:00 (RESOCONTO 24H) ====================
-// ==================== NOTIFICA ORE 8:00 (RESOCONTO 24H) ====================
 function simulateMorningNotification() {
   const banner = document.getElementById('iosNotificationBanner');
   const msg = document.getElementById('notifBannerMessage');
   const car = appCars[activeCarIndex];
-  const totalFuel = car.refuels.reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
+  const now = new Date();
+  const currMonthRefuels = (car.refuels || []).filter(r => isTransactionInCurrentMonth(r, now));
+  const totalFuel = currMonthRefuels.reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
   const totalKm = car.trips.reduce((acc, t) => acc + (parseFloat(t.km) || 0), 0);
-  const totalLiters = car.refuels.reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0);
+  const totalLiters = currMonthRefuels.reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0);
 
   if (banner && msg) {
     if (totalKm > 0 || totalFuel > 0) {
@@ -1107,11 +1177,12 @@ function renderVolumetricDistribution() {
   const legendContainer = document.getElementById('volumetricDistributionLegend');
   if (!barContainer || !legendContainer) return;
 
-  const totalGarageLiters = appCars.reduce((tot, c) => tot + (c.refuels || []).reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0), 0);
+  const now = new Date();
+  const totalGarageLiters = appCars.reduce((tot, c) => tot + (c.refuels || []).filter(r => isTransactionInCurrentMonth(r, now)).reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0), 0);
 
   if (totalGarageLiters === 0) {
     barContainer.innerHTML = '<div class="w-full h-full bg-zinc-800"></div>';
-    legendContainer.innerHTML = '<span class="text-zinc-500 italic">Nessun rifornimento registrato nel garage.</span>';
+    legendContainer.innerHTML = '<span class="text-zinc-500 italic">Nessun rifornimento registrato nel mese corrente.</span>';
     return;
   }
 
@@ -1119,7 +1190,7 @@ function renderVolumetricDistribution() {
   let legendHtml = '';
 
   appCars.forEach((c, idx) => {
-    const cLiters = (c.refuels || []).reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0);
+    const cLiters = (c.refuels || []).filter(r => isTransactionInCurrentMonth(r, now)).reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0);
     const pct = totalGarageLiters > 0 ? ((cLiters / totalGarageLiters) * 100) : 0;
     const color = CAR_PALETTE[idx % CAR_PALETTE.length];
 
@@ -1144,6 +1215,10 @@ function renderVolumetricDistribution() {
 // ==================== RENDERING PRINCIPALE ====================
 function renderAll() {
   const car = appCars[activeCarIndex];
+  const now = new Date();
+
+  // Sincronizza storico mensile per ogni auto (ogni 1° del mese il mese corrente riparte da 0)
+  appCars.forEach(c => syncCarHistoryMonths(c, now));
 
   // Odometro & badges
   const labelFuel = document.getElementById('labelCarFuel');
@@ -1156,33 +1231,51 @@ function renderAll() {
   // Banner assicurazione automatico a 14 giorni
   updateInsuranceAlertBanner();
 
-  // Calcoli spese e km reali
-  const totalFuel = car.refuels.reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
-  const totalKm = car.trips.reduce((acc, t) => acc + (parseFloat(t.km) || 0), 0);
-  const totalLitersCar = car.refuels.reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0);
-  const totalLitersGarage = appCars.reduce((tot, c) => tot + c.refuels.reduce((a, r) => a + (parseFloat(r.liters) || 0), 0), 0);
+  // Calcoli spese del MESE CORRENTE (riparte da € 0,00 ogni 1° del mese) e km/ore reali
+  const currentMonthRefuels = (car.refuels || []).filter(r => isTransactionInCurrentMonth(r, now));
+  const currentMonthFuel = currentMonthRefuels.reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
+  const totalKm = (car.trips || []).reduce((acc, t) => acc + (parseFloat(t.km) || 0), 0);
+  const currentMonthLitersCar = currentMonthRefuels.reduce((acc, r) => acc + (parseFloat(r.liters) || 0), 0);
+  const currentMonthLitersGarage = appCars.reduce((tot, c) => tot + (c.refuels || []).filter(r => isTransactionInCurrentMonth(r, now)).reduce((a, r) => a + (parseFloat(r.liters) || 0), 0), 0);
 
   const kpiFuel = document.getElementById('kpiFuelTotal');
-  if (kpiFuel) kpiFuel.innerText = '€ ' + totalFuel.toFixed(2).replace('.', ',');
+  if (kpiFuel) kpiFuel.innerText = '€ ' + currentMonthFuel.toFixed(2).replace('.', ',');
+  const kpiFuelSub = document.getElementById('kpiFuelMonthLabel');
+  if (kpiFuelSub) kpiFuelSub.innerText = `Mese di ${IT_MONTH_NAMES[now.getMonth()]}`;
+
   const kpiKm = document.getElementById('kpiKmTotal');
   if (kpiKm) kpiKm.innerText = totalKm.toLocaleString('it-IT') + ' km';
 
   const userCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
   const eff = userCons.toFixed(2) + ' L/100km';
   const secEff = (100 / userCons).toFixed(1) + ' km/l';
-  const fuelPrice = car.refuels.length > 0 && car.refuels[0].pricePerLiter ? parseFloat(car.refuels[0].pricePerLiter) : (car.fuelType === 'Benzina' ? 1.819 : (car.fuelType === 'Ibrida' ? 1.809 : 1.759));
-  const costKmNum = (userCons / 100) * fuelPrice;
-  const costKm = '€ ' + costKmNum.toFixed(3).replace('.', ',') + ' /km';
 
   const kpiEff = document.getElementById('kpiEfficiency');
   if (kpiEff) kpiEff.innerText = eff;
   const kpiL = document.getElementById('kpiLiters100');
   if (kpiL) kpiL.innerText = secEff;
-  const kpiC = document.getElementById('kpiCostKm');
-  if (kpiC) kpiC.innerText = costKm;
 
-  // Aggiornamento Sezione Litri nel Resoconto (100% Dinamico)
-  const dailyLiters = car.refuels.length > 0 ? (totalLitersCar / 30).toFixed(1) + ' L/gg' : '0.0 L/gg';
+  // Calcolo Durata in Ore di Guida (sostituisce il Costo Vivo in basso a destra nella prima pagina)
+  const totalDriveMinutes = (car.trips || []).reduce((acc, t) => acc + (parseFloat(t.durationMinutes) || 0), 0);
+  const totalDriveHours = totalDriveMinutes / 60;
+  const kpiDriveH = document.getElementById('kpiDriveHours');
+  const kpiDriveHSub = document.getElementById('kpiDriveHoursSub');
+  if (kpiDriveH) {
+    kpiDriveH.innerText = totalDriveHours.toFixed(1).replace('.', ',') + ' h';
+  }
+  if (kpiDriveHSub) {
+    if (totalDriveMinutes > 0) {
+      const hInt = Math.floor(totalDriveMinutes / 60);
+      const mRem = Math.round(totalDriveMinutes % 60);
+      kpiDriveHSub.innerText = hInt > 0 ? `${hInt}h ${mRem}m (${Math.round(totalDriveMinutes)} min)` : `${Math.round(totalDriveMinutes)} min totali`;
+    } else {
+      kpiDriveHSub.innerText = 'Durata totale guida';
+    }
+  }
+
+  // Aggiornamento Sezione Litri nel Resoconto (Mese Corrente)
+  const daysElapsedInMonth = Math.max(1, now.getDate());
+  const dailyLiters = currentMonthRefuels.length > 0 ? (currentMonthLitersCar / daysElapsedInMonth).toFixed(1) + ' L/gg' : '0.0 L/gg';
   const statDaily = document.getElementById('statLitersDaily');
   const stat24h = document.getElementById('statLiters24h');
   const statMonthly = document.getElementById('statLitersMonthly');
@@ -1190,8 +1283,8 @@ function renderAll() {
   
   if (statDaily) statDaily.innerText = dailyLiters;
   if (stat24h) stat24h.innerText = car.refuels.length > 0 ? (parseFloat(car.refuels[0].liters) || 0).toFixed(1) + ' L' : '0.0 L';
-  if (statMonthly) statMonthly.innerText = totalLitersCar.toFixed(1) + ' L';
-  if (statTotGarage) statTotGarage.innerText = totalLitersGarage.toFixed(1) + ' L';
+  if (statMonthly) statMonthly.innerText = currentMonthLitersCar.toFixed(1) + ' L';
+  if (statTotGarage) statTotGarage.innerText = currentMonthLitersGarage.toFixed(1) + ' L';
 
   // Ripartizione volumetrica dinamica per auto del garage
   renderVolumetricDistribution();
@@ -1687,10 +1780,7 @@ function deleteRefuel(refuelId) {
   if (!car) return;
   if (!confirm("Vuoi davvero eliminare questo rifornimento?")) return;
   car.refuels = car.refuels.filter((r, idx) => (r.id ? r.id !== refuelId : String(idx) !== String(refuelId)));
-  const currMonthTotal = car.refuels.reduce((sum, r) => sum + (parseFloat(r.totalCost) || 0), 0);
-  if (Array.isArray(car.historyMonths) && car.historyMonths.length > 5) {
-    car.historyMonths[5] = parseFloat(currMonthTotal.toFixed(2));
-  }
+  syncCarHistoryMonths(car);
   currentlyOpenSwipeCard = null;
   saveCars();
   renderAll();
@@ -2622,13 +2712,14 @@ function calcRefuelModalTotal() {
 
 // ==================== RENDERING REPORT PDF DINAMICO ====================
 function renderPdfReport() {
-  // 1. Spese per auto nella legenda del PDF (100% dinamico per tutto il garage)
+  const now = new Date();
+  // 1. Spese per auto nella legenda del PDF (Mese Corrente per tutto il garage)
   const legendCont = document.getElementById('pdfLegendCarsContainer');
   if (legendCont) {
     let legHtml = '';
     appCars.forEach((c, idx) => {
       const color = CAR_PALETTE[idx % CAR_PALETTE.length];
-      const fuelCost = (c.refuels || []).reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
+      const fuelCost = (c.refuels || []).filter(r => isTransactionInCurrentMonth(r, now)).reduce((acc, r) => acc + (parseFloat(r.totalCost) || 0), 0);
       legHtml += `
         <div class="flex items-center gap-1">
           <span class="w-2 h-2 rounded-sm ${color.bg} inline-block"></span>
@@ -2653,7 +2744,7 @@ function renderPdfReport() {
     } else {
       tbody.innerHTML = allTrips.map(t => `
         <tr>
-          <td class="p-1.5 font-medium">${t.date || 'Oggi'}</td>
+          <td class="p-1.5 font-medium">${formatTransactionDisplayDate(t)}</td>
           <td class="p-1.5 font-bold">${t.carName}</td>
           <td class="p-1.5">${t.title}</td>
           <td class="p-1.5 text-right font-mono">${t.km} km</td>
@@ -2663,17 +2754,17 @@ function renderPdfReport() {
     }
   }
 
-  // 3. Litri Totali Dinamici
-  const totalLitersGarage = appCars.reduce((tot, c) => tot + c.refuels.reduce((a, r) => a + (parseFloat(r.liters) || 0), 0), 0);
+  // 3. Litri Totali Dinamici (Mese Corrente)
+  const totalLitersGarage = appCars.reduce((tot, c) => tot + (c.refuels || []).filter(r => isTransactionInCurrentMonth(r, now)).reduce((a, r) => a + (parseFloat(r.liters) || 0), 0), 0);
   const pdf24h = document.getElementById('pdfLiters24h');
   const pdfDaily = document.getElementById('pdfLitersDaily');
   const pdfMonthly = document.getElementById('pdfLitersMonthly');
 
   const currCar = appCars[activeCarIndex];
-  const currCarLiters = currCar.refuels.reduce((a, r) => a + (parseFloat(r.liters) || 0), 0);
+  const daysElapsed = Math.max(1, now.getDate());
 
   if (pdf24h) pdf24h.innerText = currCar.refuels.length > 0 ? (parseFloat(currCar.refuels[0].liters) || 0).toFixed(1) + ' L' : '0.0 L';
-  if (pdfDaily) pdfDaily.innerText = (totalLitersGarage / 30).toFixed(1) + ' L / gg';
+  if (pdfDaily) pdfDaily.innerText = (totalLitersGarage / daysElapsed).toFixed(1) + ' L / gg';
   if (pdfMonthly) pdfMonthly.innerText = totalLitersGarage.toFixed(1) + ' L';
 
   // 4. Stato Polizze
@@ -2910,10 +3001,7 @@ function saveRefuelFromModal() {
   // Ordinamento cronologico garantito
   car.refuels.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-  const currMonthTotal = car.refuels.reduce((sum, r) => sum + (parseFloat(r.totalCost) || 0), 0);
-  if (Array.isArray(car.historyMonths) && car.historyMonths.length > 5) {
-    car.historyMonths[5] = parseFloat(currMonthTotal.toFixed(2));
-  }
+  syncCarHistoryMonths(car);
 
   saveCars();
   closeModal('modalRefuel');
