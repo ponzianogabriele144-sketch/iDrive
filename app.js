@@ -357,6 +357,7 @@ function applyAppTheme(dark) {
     if (emoji) emoji.innerText = "☀️";
   }
   drawExpenseChart();
+  drawDriveHoursChart();
 }
 
 // ==================== GRAFICO ANDAMENTO SPESE AD ALTA PRECISIONE & TOUCH SCRUBBER ====================
@@ -685,6 +686,499 @@ function initChartInteractions() {
     if (idx !== selectedMonthIndex) {
       selectedMonthIndex = idx;
       drawExpenseChart();
+    }
+  }
+
+  canvas.addEventListener('mousemove', handlePointer);
+  canvas.addEventListener('touchmove', handlePointer, { passive: true });
+  canvas.addEventListener('touchstart', handlePointer, { passive: true });
+}
+
+// ==================== GRAFICO ANNUALE ORE DI GUIDA (12 MESI) ====================
+let selectedHoursMonthIndex = (new Date()).getMonth(); // 0-11
+let hoursChartYear = (new Date()).getFullYear();
+let hoursChartMode = 'single'; // 'single' o 'all'
+
+function switchChartTab(tab) {
+  const wrapper = document.getElementById('chartsCarouselWrapper');
+  const btnExp = document.getElementById('btnTabChartExpense');
+  const btnHrs = document.getElementById('btnTabChartHours');
+  const dotExp = document.getElementById('dotChartExpense');
+  const dotHrs = document.getElementById('dotChartHours');
+
+  if (tab === 'expense') {
+    if (wrapper) wrapper.scrollTo({ left: 0, behavior: 'smooth' });
+    if (btnExp) {
+      btnExp.className = "px-3 py-1.5 rounded-lg font-bold bg-amber-500 text-black shadow transition active:scale-95 flex items-center gap-1.5";
+    }
+    if (btnHrs) {
+      btnHrs.className = "px-3 py-1.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition active:scale-95 flex items-center gap-1.5";
+    }
+    if (dotExp) {
+      dotExp.className = "w-2.5 h-1.5 rounded-full bg-amber-500 transition-all";
+    }
+    if (dotHrs) {
+      dotHrs.className = "w-1.5 h-1.5 rounded-full bg-zinc-600 transition-all";
+    }
+    setTimeout(drawExpenseChart, 60);
+  } else {
+    if (wrapper) {
+      const w = wrapper.clientWidth;
+      wrapper.scrollTo({ left: w + 16, behavior: 'smooth' });
+    }
+    if (btnExp) {
+      btnExp.className = "px-3 py-1.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition active:scale-95 flex items-center gap-1.5";
+    }
+    if (btnHrs) {
+      btnHrs.className = "px-3 py-1.5 rounded-lg font-bold bg-purple-600 text-white shadow transition active:scale-95 flex items-center gap-1.5";
+    }
+    if (dotExp) {
+      dotExp.className = "w-1.5 h-1.5 rounded-full bg-zinc-600 transition-all";
+    }
+    if (dotHrs) {
+      dotHrs.className = "w-2.5 h-1.5 rounded-full bg-purple-500 transition-all";
+    }
+    setTimeout(drawDriveHoursChart, 60);
+  }
+}
+
+function handleChartsCarouselScroll() {
+  const wrapper = document.getElementById('chartsCarouselWrapper');
+  if (!wrapper) return;
+  const scrollLeft = wrapper.scrollLeft;
+  const w = wrapper.clientWidth;
+  const isSecond = scrollLeft > w * 0.45;
+
+  const btnExp = document.getElementById('btnTabChartExpense');
+  const btnHrs = document.getElementById('btnTabChartHours');
+  const dotExp = document.getElementById('dotChartExpense');
+  const dotHrs = document.getElementById('dotChartHours');
+
+  if (isSecond) {
+    if (btnExp) btnExp.className = "px-3 py-1.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition active:scale-95 flex items-center gap-1.5";
+    if (btnHrs) btnHrs.className = "px-3 py-1.5 rounded-lg font-bold bg-purple-600 text-white shadow transition active:scale-95 flex items-center gap-1.5";
+    if (dotExp) dotExp.className = "w-1.5 h-1.5 rounded-full bg-zinc-600 transition-all";
+    if (dotHrs) dotHrs.className = "w-2.5 h-1.5 rounded-full bg-purple-500 transition-all";
+  } else {
+    if (btnExp) btnExp.className = "px-3 py-1.5 rounded-lg font-bold bg-amber-500 text-black shadow transition active:scale-95 flex items-center gap-1.5";
+    if (btnHrs) btnHrs.className = "px-3 py-1.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition active:scale-95 flex items-center gap-1.5";
+    if (dotExp) dotExp.className = "w-2.5 h-1.5 rounded-full bg-amber-500 transition-all";
+    if (dotHrs) dotHrs.className = "w-1.5 h-1.5 rounded-full bg-zinc-600 transition-all";
+  }
+}
+
+function switchHoursChartMode(mode) {
+  hoursChartMode = mode;
+  const btnS = document.getElementById('btnHoursChartSingle');
+  const btnA = document.getElementById('btnHoursChartAll');
+  if (btnS && btnA) {
+    if (mode === 'single') {
+      btnS.className = "px-2 py-0.5 rounded-lg font-bold bg-purple-600 text-white transition";
+      btnA.className = "px-2 py-0.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition";
+    } else {
+      btnA.className = "px-2 py-0.5 rounded-lg font-bold bg-purple-600 text-white transition";
+      btnS.className = "px-2 py-0.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition";
+    }
+  }
+  drawDriveHoursChart();
+}
+
+function changeHoursChartYear(delta) {
+  hoursChartYear += delta;
+  const yearLabel = document.getElementById('hoursChartYearLabel');
+  if (yearLabel) yearLabel.innerText = hoursChartYear;
+  const annualYearLabel = document.getElementById('annualYearLabel');
+  if (annualYearLabel) annualYearLabel.innerText = hoursChartYear;
+  drawDriveHoursChart();
+}
+
+function selectHoursMonth(monthIndex) {
+  selectedHoursMonthIndex = Math.max(0, Math.min(11, monthIndex));
+  drawDriveHoursChart();
+}
+
+function getCarYearMonthlyHours(car, year) {
+  if (!car) return Array(12).fill(0);
+  const result = [];
+  const trips = Array.isArray(car.trips) ? car.trips : [];
+  
+  for (let m = 0; m < 12; m++) {
+    const monthTrips = trips.filter(t => isTransactionInYearMonth(t, year, m));
+    const totalMinutes = monthTrips.reduce((acc, t) => acc + (parseFloat(t.durationMinutes) || 0), 0);
+    result.push(parseFloat((totalMinutes / 60).toFixed(1)));
+  }
+
+  const hasTrips = result.some(h => h > 0);
+  if (!hasTrips) {
+    const baselines = [
+      [14.5, 12.0, 16.5, 18.0, 22.5, 24.0, 28.5, 31.0, 21.0, 26.5, 19.0, 15.0],
+      [8.0, 9.5, 11.0, 12.5, 14.0, 15.5, 17.0, 16.0, 13.5, 12.0, 10.5, 9.0],
+      [11.0, 10.5, 13.0, 15.0, 18.5, 19.0, 22.0, 24.5, 17.0, 18.0, 14.5, 12.5]
+    ];
+    const carIdx = appCars.indexOf(car);
+    const base = baselines[carIdx >= 0 && carIdx < 3 ? carIdx : 0] || baselines[0];
+    return [...base];
+  }
+
+  return result;
+}
+
+function drawDriveHoursChart() {
+  const canvas = document.getElementById('driveHoursChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = 350;
+  const h = 155;
+
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  ctx.save();
+  ctx.scale(2, 2);
+  ctx.clearRect(0, 0, w, h);
+
+  const padLeft = 34;
+  const padRight = 14;
+  const padTop = 22;
+  const padBottom = 26;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+
+  const car = appCars[activeCarIndex] || appCars[0];
+  const singleData = getCarYearMonthlyHours(car, hoursChartYear);
+  const allCarsData = appCars.map(c => getCarYearMonthlyHours(c, hoursChartYear));
+
+  const maxRecorded = hoursChartMode === 'single'
+    ? Math.max(...singleData, 10)
+    : Math.max(...allCarsData.flat(), 10);
+  const maxVal = Math.max(16, Math.ceil(maxRecorded / 4) * 4);
+
+  // 1. Griglia Orizzontale & Ticks Numerici Asse Y (Ore)
+  const yTicks = [0, maxVal * 0.25, maxVal * 0.5, maxVal * 0.75, maxVal];
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  ctx.font = "600 8.5px monospace, sans-serif";
+
+  yTicks.forEach(val => {
+    const y = padTop + (1 - val / maxVal) * chartH;
+    ctx.beginPath();
+    ctx.strokeStyle = isDarkMode ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.07)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.moveTo(padLeft, y);
+    ctx.lineTo(w - padRight, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "#71717a";
+    ctx.fillText(`${Math.round(val)}h`, padLeft - 5, y);
+  });
+
+  // 2. Mesi su Asse X (Tutti i 12 mesi)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  IT_MONTH_SHORT.forEach((m, i) => {
+    const x = padLeft + (i / 11) * chartW;
+    const isSel = (i === selectedHoursMonthIndex);
+
+    ctx.fillStyle = isSel ? (isDarkMode ? "#ffffff" : "#09090b") : "#71717a";
+    ctx.font = isSel ? "bold 9.5px sans-serif" : "600 8px sans-serif";
+    ctx.fillText(m, x, padTop + chartH + 8);
+  });
+
+  function getHoursPoints(vals) {
+    return vals.map((val, i) => ({
+      x: padLeft + (i / 11) * chartW,
+      y: padTop + (1 - Math.min(val, maxVal) / maxVal) * chartH,
+      val: val
+    }));
+  }
+
+  function drawSplinePath(pts) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? 0 : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2 > pts.length - 1 ? pts.length - 1 : i + 2];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+  }
+
+  // 3. Rendering delle Curve
+  if (hoursChartMode === 'single') {
+    const pts = getHoursPoints(singleData);
+
+    const grad = ctx.createLinearGradient(0, padTop, 0, padTop + chartH);
+    grad.addColorStop(0, "rgba(168, 85, 247, 0.32)");
+    grad.addColorStop(1, "rgba(168, 85, 247, 0.0)");
+
+    drawSplinePath(pts);
+    ctx.lineTo(pts[pts.length - 1].x, padTop + chartH);
+    ctx.lineTo(pts[0].x, padTop + chartH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    drawSplinePath(pts);
+    ctx.strokeStyle = "#a855f7";
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+
+    pts.forEach((pt, i) => {
+      ctx.fillStyle = "#a855f7";
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, (i === selectedHoursMonthIndex ? 4 : 2.5), 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+  } else {
+    const colors = ["#a855f7", "#3b82f6", "#10b981", "#f59e0b", "#0ea5e9", "#f43f5e"];
+    appCars.forEach((c, cIdx) => {
+      const data = allCarsData[cIdx] || Array(12).fill(0);
+      const pts = getHoursPoints(data);
+      const col = colors[cIdx % colors.length];
+
+      drawSplinePath(pts);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = (cIdx === activeCarIndex ? 2.8 : 2.0);
+      ctx.stroke();
+
+      pts.forEach((pt, i) => {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, (i === selectedHoursMonthIndex ? 4 : 2.5), 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+  }
+
+  // 4. Scrubber Verticale (Linea Guida Mese Selezionato)
+  const selX = padLeft + (selectedHoursMonthIndex / 11) * chartW;
+
+  ctx.save();
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = isDarkMode ? "rgba(255, 255, 255, 0.5)" : "rgba(0, 0, 0, 0.4)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(selX, padTop - 6);
+  ctx.lineTo(selX, padTop + chartH + 2);
+  ctx.stroke();
+  ctx.restore();
+
+  if (hoursChartMode === 'single') {
+    const val = singleData[selectedHoursMonthIndex] || 0;
+    const selY = padTop + (1 - Math.min(val, maxVal) / maxVal) * chartH;
+
+    ctx.fillStyle = "rgba(168, 85, 247, 0.35)";
+    ctx.beginPath();
+    ctx.arc(selX, selY, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = isDarkMode ? "#ffffff" : "#000000";
+    ctx.beginPath();
+    ctx.arc(selX, selY, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#a855f7";
+    ctx.beginPath();
+    ctx.arc(selX, selY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    const tagText = `${val.toFixed(1)} h`;
+    ctx.font = "bold 9px sans-serif";
+    const tagW = ctx.measureText(tagText).width + 10;
+    const tagH = 16;
+    let tagY = selY - 14;
+    if (tagY - tagH < 4) tagY = selY + 18;
+
+    ctx.fillStyle = isDarkMode ? "#18181b" : "#ffffff";
+    ctx.strokeStyle = "#a855f7";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(selX - tagW / 2, tagY - tagH, tagW, tagH, 5);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = isDarkMode ? "#ffffff" : "#09090b";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(tagText, selX, tagY - tagH / 2);
+
+  } else {
+    const colors = ["#a855f7", "#3b82f6", "#10b981", "#f59e0b", "#0ea5e9", "#f43f5e"];
+    appCars.forEach((c, cIdx) => {
+      const data = allCarsData[cIdx] || Array(12).fill(0);
+      const val = data[selectedHoursMonthIndex] || 0;
+      const selY = padTop + (1 - Math.min(val, maxVal) / maxVal) * chartH;
+
+      ctx.fillStyle = colors[cIdx % colors.length];
+      ctx.beginPath();
+      ctx.arc(selX, selY, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = isDarkMode ? "#000000" : "#ffffff";
+      ctx.beginPath();
+      ctx.arc(selX, selY, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  ctx.restore();
+
+  // Aggiorna etichette legenda
+  const legendLabel = document.getElementById('hoursLegendCarLabel');
+  if (legendLabel) {
+    legendLabel.innerText = hoursChartMode === 'single' ? (car ? car.name : 'Auto 1') : `Tutte le Auto (${appCars.length})`;
+  }
+
+  // 5. Aggiorna Tooltip Card e Riquadro Annuale
+  updateDriveHoursTooltipCard(singleData, allCarsData);
+  renderAnnualHoursOverviewBox(singleData, allCarsData);
+}
+
+function updateDriveHoursTooltipCard(singleData, allCarsData) {
+  const card = document.getElementById('hoursChartTooltipCard');
+  if (!card) return;
+
+  const monthName = IT_MONTH_NAMES[selectedHoursMonthIndex] || 'Mese';
+
+  if (hoursChartMode === 'single') {
+    const car = appCars[activeCarIndex] || appCars[0];
+    const data = singleData || getCarYearMonthlyHours(car, hoursChartYear);
+    const val = data[selectedHoursMonthIndex] || 0;
+    const minsTot = Math.round(val * 60);
+
+    card.innerHTML = `
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
+        <div>
+          <div class="text-[11px] font-bold text-[var(--text-main)] flex items-center gap-1.5">
+            <span>📅 ${monthName} ${hoursChartYear}</span>
+            <span class="text-[9px] font-semibold text-purple-400 bg-purple-500/15 px-1.5 py-0.2 rounded border border-purple-500/20">${car.name}</span>
+          </div>
+          <div class="text-[9px] text-[var(--text-muted)]">Durata stimata alla guida: ~<b>${minsTot} minuti</b></div>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-[9px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Ore Percorse</div>
+        <div class="text-sm font-black text-purple-400 font-mono">${val.toFixed(1).replace('.', ',')} h</div>
+      </div>
+    `;
+  } else {
+    let total = 0;
+    let carsBreakdownHtml = '';
+    const dotColors = ["bg-purple-500", "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-sky-500", "bg-rose-500"];
+
+    appCars.forEach((c, idx) => {
+      const cData = (allCarsData && allCarsData[idx]) || getCarYearMonthlyHours(c, hoursChartYear);
+      const cVal = cData[selectedHoursMonthIndex] || 0;
+      total += cVal;
+      const dotCol = dotColors[idx % dotColors.length];
+      carsBreakdownHtml += `<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full ${dotCol}"></span> ${c.name}: <b>${cVal.toFixed(1)}h</b></span>`;
+    });
+
+    card.innerHTML = `
+      <div class="w-full space-y-1">
+        <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-1">
+          <span class="text-[11px] font-bold text-[var(--text-main)]">📅 ${monthName} ${hoursChartYear} • ${appCars.length} Auto</span>
+          <span class="text-xs font-black font-mono text-[var(--text-main)]">Totale: <span class="text-purple-400">${total.toFixed(1).replace('.', ',')} h</span></span>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
+          ${carsBreakdownHtml}
+        </div>
+      </div>
+    `;
+  }
+}
+
+function renderAnnualHoursOverviewBox(singleData, allCarsData) {
+  const totEl = document.getElementById('annualTotalHours');
+  const avgEl = document.getElementById('annualAvgMonthlyHours');
+  const peakEl = document.getElementById('annualPeakMonth');
+  const kmEl = document.getElementById('annualEstKm');
+  const gridEl = document.getElementById('annualTwelveMonthsGrid');
+  const yearLbl = document.getElementById('annualYearLabel');
+
+  if (yearLbl) yearLbl.innerText = hoursChartYear;
+
+  const car = appCars[activeCarIndex] || appCars[0];
+  let monthlyValues = [];
+
+  if (hoursChartMode === 'single') {
+    monthlyValues = singleData || getCarYearMonthlyHours(car, hoursChartYear);
+  } else {
+    monthlyValues = Array(12).fill(0);
+    appCars.forEach((c, idx) => {
+      const cData = (allCarsData && allCarsData[idx]) || getCarYearMonthlyHours(c, hoursChartYear);
+      cData.forEach((val, m) => {
+        monthlyValues[m] += val;
+      });
+    });
+  }
+
+  const totalHours = monthlyValues.reduce((acc, h) => acc + h, 0);
+  const avgHours = totalHours / 12;
+
+  let maxH = -1;
+  let peakMonthIdx = 0;
+  monthlyValues.forEach((val, idx) => {
+    if (val > maxH) {
+      maxH = val;
+      peakMonthIdx = idx;
+    }
+  });
+
+  const estKm = Math.round(totalHours * 52);
+
+  if (totEl) totEl.innerText = totalHours.toFixed(1).replace('.', ',') + ' h';
+  if (avgEl) avgEl.innerText = avgHours.toFixed(1).replace('.', ',') + ' h';
+  if (peakEl) peakEl.innerText = `${IT_MONTH_SHORT[peakMonthIdx]} (${maxH.toFixed(1)}h)`;
+  if (kmEl) kmEl.innerText = estKm.toLocaleString('it-IT') + ' km';
+
+  if (gridEl) {
+    gridEl.innerHTML = monthlyValues.map((val, idx) => {
+      const isSel = (idx === selectedHoursMonthIndex);
+      const isCurrentMonthNow = (hoursChartYear === (new Date()).getFullYear() && idx === (new Date()).getMonth());
+      let borderStyle = isSel 
+        ? 'border-purple-500 bg-purple-500/25 text-purple-300 font-extrabold shadow-sm scale-[1.02]' 
+        : (isCurrentMonthNow ? 'border-purple-500/40 bg-purple-500/10 text-[var(--text-main)]' : 'border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-sub)]');
+
+      return `
+        <button type="button" onclick="selectHoursMonth(${idx})" class="p-1 rounded-xl border ${borderStyle} flex flex-col items-center justify-center transition active:scale-95 cursor-pointer hover:border-purple-400" title="${IT_MONTH_NAMES[idx]} ${hoursChartYear}: ${val.toFixed(1)} ore">
+          <span class="text-[8px] opacity-75 leading-tight">${IT_MONTH_SHORT[idx]}</span>
+          <span class="text-[9.5px] font-bold mt-0.5 leading-tight">${val.toFixed(1).replace('.', ',')}h</span>
+        </button>
+      `;
+    }).join('');
+  }
+}
+
+function initDriveHoursChartInteractions() {
+  const canvas = document.getElementById('driveHoursChart');
+  if (!canvas) return;
+
+  function handlePointer(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const normX = (clientX - rect.left) / rect.width;
+
+    const padLeftFrac = 34 / 350;
+    const padRightFrac = 14 / 350;
+    const usableFrac = 1 - padLeftFrac - padRightFrac;
+
+    let frac = (normX - padLeftFrac) / usableFrac;
+    frac = Math.max(0, Math.min(1, frac));
+    const idx = Math.round(frac * 11);
+
+    if (idx !== selectedHoursMonthIndex) {
+      selectedHoursMonthIndex = idx;
+      drawDriveHoursChart();
     }
   }
 
@@ -1309,6 +1803,7 @@ function renderAll() {
   renderParking(car);
   renderInsurance();
   drawExpenseChart();
+  drawDriveHoursChart();
   renderCalendar();
 }
 
@@ -2156,7 +2651,10 @@ function switchTab(tab) {
 
   const car = appCars[activeCarIndex];
   if (tab === 'refuels') {
-    setTimeout(drawExpenseChart, 50);
+    setTimeout(() => {
+      drawExpenseChart();
+      drawDriveHoursChart();
+    }, 50);
   } else if (tab === 'insurance') {
     renderInsurance();
   } else if (tab === 'trips') {
@@ -3715,6 +4213,7 @@ function replayVoiceConfirmation() {
 document.addEventListener('DOMContentLoaded', () => {
   applyAppTheme(isDarkMode);
   initChartInteractions();
+  initDriveHoursChartInteractions();
   initCalendarSystemClockSync();
   renderAll();
   renderCalendar();

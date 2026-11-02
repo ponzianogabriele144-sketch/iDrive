@@ -78,6 +78,13 @@
       100% { transform: scale(0.95); opacity: 0.8; }
     }
     .pulse-dot { animation: pulse-ring 2s infinite ease-in-out; }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
 
     @media print {
       body * { visibility: hidden; }
@@ -345,39 +352,147 @@
           </button>
         </div>
 
-        <!-- ==================== SEZIONE GRAFICO ANDAMENTO CARBURANTE ==================== -->
-        <div class="bg-[var(--bg-card)] border border-[var(--border-color)] p-3.5 rounded-2xl shadow-sm space-y-2.5">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-xs font-bold text-[var(--text-main)]">Andamento Spese Carburante</h3>
-              <p class="text-[10px] text-[var(--text-muted)]">Passa il dito sul grafico per i dettagli esatti</p>
-            </div>
-
-            <!-- Switcher: Singola Auto vs Tutte (3 Auto) -->
-            <div class="flex items-center bg-[var(--bg-sub)] p-0.5 rounded-xl border border-[var(--border-color)] text-[10px]">
-              <button onclick="switchChartMode('single')" id="btnChartSingle" class="px-2 py-0.5 rounded-lg font-bold bg-amber-500 text-black transition">
-                Singola
+        <!-- ==================== SEZIONE GRAFICI AFFIANCATI (SPESE & ORE GUIDA 12 MESI) ==================== -->
+        <div class="space-y-2">
+          <!-- Switcher Grafici Rapido & Indicatori Slide -->
+          <div class="flex items-center justify-between px-0.5">
+            <div class="flex items-center bg-[var(--bg-card)] p-0.5 rounded-xl border border-[var(--border-color)] text-[11px] shadow-sm">
+              <button type="button" onclick="switchChartTab('expense')" id="btnTabChartExpense" class="px-3 py-1.5 rounded-lg font-bold bg-amber-500 text-black shadow transition active:scale-95 flex items-center gap-1.5">
+                <span>⛽ Spese (€)</span>
               </button>
-              <button onclick="switchChartMode('all')" id="btnChartAll" class="px-2 py-0.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
-                Tutte (3 Auto)
+              <button type="button" onclick="switchChartTab('hours')" id="btnTabChartHours" class="px-3 py-1.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition active:scale-95 flex items-center gap-1.5">
+                <span>⏱️ Ore Guida (1 Anno)</span>
               </button>
             </div>
+            
+            <div class="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+              <span id="dotChartExpense" class="w-2.5 h-1.5 rounded-full bg-amber-500 transition-all"></span>
+              <span id="dotChartHours" class="w-1.5 h-1.5 rounded-full bg-zinc-600 transition-all"></span>
+              <span class="text-[9px] opacity-75">👈 Scorri 👉</span>
+            </div>
           </div>
 
-          <!-- Interactive Live Data Display Card (Valore al tocco del dito) -->
-          <div id="chartTooltipCard" class="bg-[var(--bg-sub)] px-3 py-2 rounded-xl border border-[var(--border-color)] flex items-center justify-between text-xs transition-all min-h-[46px]">
-            <!-- Popolato da JS -->
-          </div>
+          <!-- Carousel a 2 Slide Affiancate (Snap orizzontale nativo iOS) -->
+          <div id="chartsCarouselWrapper" class="flex overflow-x-auto snap-x snap-mandatory gap-3 no-scrollbar scroll-smooth pb-0.5" onscroll="handleChartsCarouselScroll()">
+            
+            <!-- SLIDE 1: GRAFICO SPESE CARBURANTE (6 MESI) -->
+            <div id="slideChartExpense" class="w-full shrink-0 snap-center bg-[var(--bg-card)] border border-[var(--border-color)] p-3.5 rounded-2xl shadow-sm space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-xs font-bold text-[var(--text-main)]">Andamento Spese Carburante</h3>
+                  <p class="text-[10px] text-[var(--text-muted)]">Passa il dito sul grafico per i dettagli esatti</p>
+                </div>
 
-          <!-- Canvas del Grafico Interattivo con Touch Scrubber -->
-          <div class="relative w-full h-[155px] bg-[var(--bg-sub)] rounded-xl p-1 border border-[var(--border-color)] overflow-hidden select-none">
-            <canvas id="fuelExpenseChart" width="800" height="310" class="w-full h-full block touch-none cursor-crosshair"></canvas>
-          </div>
+                <!-- Switcher: Singola Auto vs Tutte -->
+                <div class="flex items-center bg-[var(--bg-sub)] p-0.5 rounded-xl border border-[var(--border-color)] text-[10px]">
+                  <button type="button" onclick="switchChartMode('single')" id="btnChartSingle" class="px-2 py-0.5 rounded-lg font-bold bg-amber-500 text-black transition">
+                    Singola
+                  </button>
+                  <button type="button" onclick="switchChartMode('all')" id="btnChartAll" class="px-2 py-0.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
+                    Tutte
+                  </button>
+                </div>
+              </div>
 
-          <!-- Legenda Grafico & Istruzioni -->
-          <div id="chartLegend" class="flex items-center justify-between text-[10px] text-[var(--text-muted)] px-1">
-            <span class="flex items-center gap-1.5 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> <span id="legendCarLabel">Auto 1</span></span>
-            <span class="text-[9px] text-[var(--text-muted)] flex items-center gap-1">👆 Trascina il dito</span>
+              <!-- Interactive Live Data Display Card (Valore al tocco del dito) -->
+              <div id="chartTooltipCard" class="bg-[var(--bg-sub)] px-3 py-2 rounded-xl border border-[var(--border-color)] flex items-center justify-between text-xs transition-all min-h-[46px]">
+                <!-- Popolato da JS -->
+              </div>
+
+              <!-- Canvas del Grafico Interattivo con Touch Scrubber -->
+              <div class="relative w-full h-[155px] bg-[var(--bg-sub)] rounded-xl p-1 border border-[var(--border-color)] overflow-hidden select-none">
+                <canvas id="fuelExpenseChart" width="800" height="310" class="w-full h-full block touch-none cursor-crosshair"></canvas>
+              </div>
+
+              <!-- Legenda Grafico & Istruzioni -->
+              <div id="chartLegend" class="flex items-center justify-between text-[10px] text-[var(--text-muted)] px-1">
+                <span class="flex items-center gap-1.5 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> <span id="legendCarLabel">Auto 1</span></span>
+                <span class="text-[9px] text-[var(--text-muted)] flex items-center gap-1">👆 Trascina il dito</span>
+              </div>
+            </div>
+
+            <!-- SLIDE 2: GRAFICO ORE DI GUIDA (12 MESI • ANNUALE) -->
+            <div id="slideChartHours" class="w-full shrink-0 snap-center bg-[var(--bg-card)] border border-[var(--border-color)] p-3.5 rounded-2xl shadow-sm space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
+                    <span>⏱️ Ore di Guida</span>
+                    <span class="text-[9px] px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">12 Mesi</span>
+                  </h3>
+                  <p class="text-[10px] text-[var(--text-muted)]">Riquadro annuale con ore mese per mese</p>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                  <!-- Selettore Anno -->
+                  <div class="flex items-center bg-[var(--bg-sub)] rounded-xl border border-[var(--border-color)] px-1 py-0.5 text-[10px] font-mono">
+                    <button type="button" onclick="changeHoursChartYear(-1)" class="px-1 text-[var(--text-muted)] hover:text-[var(--text-main)] font-bold">◀</button>
+                    <span id="hoursChartYearLabel" class="font-bold text-[var(--text-main)] px-1">2026</span>
+                    <button type="button" onclick="changeHoursChartYear(1)" class="px-1 text-[var(--text-muted)] hover:text-[var(--text-main)] font-bold">▶</button>
+                  </div>
+
+                  <!-- Switcher: Singola Auto vs Tutte -->
+                  <div class="flex items-center bg-[var(--bg-sub)] p-0.5 rounded-xl border border-[var(--border-color)] text-[10px]">
+                    <button type="button" onclick="switchHoursChartMode('single')" id="btnHoursChartSingle" class="px-2 py-0.5 rounded-lg font-bold bg-purple-600 text-white transition">
+                      Singola
+                    </button>
+                    <button type="button" onclick="switchHoursChartMode('all')" id="btnHoursChartAll" class="px-2 py-0.5 rounded-lg font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition">
+                      Tutte
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Interactive Live Data Display Card per Ore di Guida -->
+              <div id="hoursChartTooltipCard" class="bg-[var(--bg-sub)] px-3 py-2 rounded-xl border border-[var(--border-color)] flex items-center justify-between text-xs transition-all min-h-[46px]">
+                <!-- Popolato da JS -->
+              </div>
+
+              <!-- Canvas del Grafico Ore di Guida (12 Mesi) -->
+              <div class="relative w-full h-[155px] bg-[var(--bg-sub)] rounded-xl p-1 border border-[var(--border-color)] overflow-hidden select-none">
+                <canvas id="driveHoursChart" width="800" height="310" class="w-full h-full block touch-none cursor-crosshair"></canvas>
+              </div>
+
+              <!-- Legenda Grafico Ore & Istruzioni -->
+              <div id="hoursChartLegend" class="flex items-center justify-between text-[10px] text-[var(--text-muted)] px-1">
+                <span class="flex items-center gap-1.5 font-medium"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> <span id="hoursLegendCarLabel">Auto 1</span></span>
+                <span class="text-[9px] text-[var(--text-muted)] flex items-center gap-1">👆 Trascina sui 12 mesi</span>
+              </div>
+
+              <!-- Riquadro Annuale 12 Mesi (Ore Mese per Mese) -->
+              <div class="p-3 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-2.5 text-xs">
+                <!-- 4 KPI Annuali -->
+                <div class="grid grid-cols-4 gap-1.5 text-center">
+                  <div class="p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)]">
+                    <div class="text-[8.5px] text-[var(--text-muted)] font-medium">Totale Anno</div>
+                    <div id="annualTotalHours" class="text-xs font-black font-mono text-purple-400 mt-0.5">0,0 h</div>
+                  </div>
+                  <div class="p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)]">
+                    <div class="text-[8.5px] text-[var(--text-muted)] font-medium">Media Mese</div>
+                    <div id="annualAvgMonthlyHours" class="text-xs font-black font-mono text-[var(--text-main)] mt-0.5">0,0 h</div>
+                  </div>
+                  <div class="p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)]">
+                    <div class="text-[8.5px] text-[var(--text-muted)] font-medium">Mese Record</div>
+                    <div id="annualPeakMonth" class="text-xs font-black font-mono text-amber-400 mt-0.5">--</div>
+                  </div>
+                  <div class="p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)]">
+                    <div class="text-[8.5px] text-[var(--text-muted)] font-medium">Km Tratte</div>
+                    <div id="annualEstKm" class="text-xs font-black font-mono text-blue-400 mt-0.5">0 km</div>
+                  </div>
+                </div>
+
+                <!-- Griglia 12 Mesi: ore mese per mese -->
+                <div class="space-y-1 pt-1 border-t border-[var(--border-color)]">
+                  <div class="flex items-center justify-between text-[9.5px] text-[var(--text-muted)]">
+                    <span class="font-semibold text-[var(--text-main)]">📅 Ore Mese per Mese (<span id="annualYearLabel">2026</span>)</span>
+                    <span class="text-[8.5px] text-purple-400">Tocca per evidenziare</span>
+                  </div>
+                  <div id="annualTwelveMonthsGrid" class="grid grid-cols-6 gap-1 text-center font-mono text-[10px]">
+                    <!-- Popolato dinamicamente da renderAnnualHoursOverviewBox() -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
