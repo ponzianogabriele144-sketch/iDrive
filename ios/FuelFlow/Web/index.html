@@ -115,27 +115,123 @@
           </div>
         </div>
 
-        <!-- Tasti Rapidi Azioni Superiori -->
-        <div class="flex items-center gap-1.5">
-          <!-- Toggle Tema (Dark / Light) -->
-          <button onclick="toggleAppTheme()" id="btnThemeToggle" title="Cambia tema chiaro/scuro" class="min-h-[36px] min-w-[36px] px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)] transition flex items-center justify-center shadow-sm active:scale-95">
-            <span id="themeEmoji">🌙</span>
+        <!-- Menu Unificato & Controlli Rapidi Ordinati (3 Stanghette / Ingranaggio) -->
+        <div class="relative flex items-center gap-1.5">
+          <!-- Pillola Stato Live (visibile solo quando BT o GPS è attivo) -->
+          <button id="headerLiveStatusPill" onclick="toggleQuickSettingsMenu()" class="hidden px-2.5 py-1 rounded-xl text-[10.5px] font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 items-center gap-1.5 transition active:scale-95">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span id="headerLiveStatusText">Live</span>
           </button>
 
-          <!-- Bluetooth Auto-Start Trigger -->
-          <button id="btnHeaderBt" onclick="toggleBtSim()" title="Simula Aggancio/Disconnessione Bluetooth Auto" class="min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-400 flex items-center gap-1 transition shadow-sm active:scale-95">
-            <span class="text-xs">📶</span> <span id="btHeaderLabel">BT Auto</span>
-          </button>
-
-          <!-- GPS Live Button -->
-          <button id="btnHeaderGps" onclick="toggleGpsLive()" class="min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-main)] flex items-center gap-1 transition shadow-sm active:scale-95">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> GPS
-          </button>
-
-          <!-- Assistente Vocale Gemini AI -->
-          <button id="btnHeaderGemini" onclick="openModalGeminiVoice()" title="Assistente Vocale Gemini AI" class="min-h-[36px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500/15 to-indigo-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 border border-purple-500/30 text-purple-300 flex items-center gap-1 transition shadow-sm active:scale-95">
+          <!-- Assistente Vocale Gemini AI Rapido -->
+          <button id="btnHeaderGemini" onclick="openModalGeminiVoice()" title="Assistente Vocale Gemini AI" class="min-h-[38px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500/15 to-indigo-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 border border-purple-500/30 text-purple-300 flex items-center gap-1 transition shadow-sm active:scale-95">
             <span class="text-xs">✨</span> <span>AI</span>
           </button>
+
+          <!-- Tasto Unico Menu Generale (3 Stanghette ☰ + Ingranaggio ⚙️) -->
+          <button id="btnQuickMenuToggle" onclick="toggleQuickSettingsMenu(event)" title="Menu Impostazioni, Bluetooth, GPS e Gestione Auto" class="relative min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)] flex items-center gap-1.5 transition shadow-sm active:scale-95">
+            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+            <span class="text-xs">⚙️</span>
+            <span id="quickMenuActiveDot" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-zinc-900 animate-pulse"></span>
+          </button>
+
+          <!-- Menu a Tendina Ordinato con Tutte le Funzioni Rapide -->
+          <div id="quickSettingsMenuDropdown" class="hidden absolute right-0 top-[46px] w-72 rounded-2xl bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--border-color)] shadow-2xl p-2 z-50 space-y-1 text-xs">
+            <div class="px-2.5 py-1.5 border-b border-[var(--border-color)] flex items-center justify-between">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1">⚙️ Pannello Controlli & Garage</span>
+              <button type="button" onclick="closeQuickSettingsMenu()" class="text-[var(--text-muted)] hover:text-[var(--text-main)] text-xs px-1">✕</button>
+            </div>
+
+            <!-- 1. Modalità Notte / Giorno -->
+            <button type="button" onclick="toggleAppTheme()" id="btnThemeToggle" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
+              <div class="flex items-center gap-2.5">
+                <span id="themeEmoji" class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-sm">🌙</span>
+                <div>
+                  <div class="font-bold text-[var(--text-main)] text-xs">Modalità Notte / Giorno</div>
+                  <div class="text-[9.5px] text-[var(--text-muted)]">Cambia tema visivo dell'app</div>
+                </div>
+              </div>
+              <span id="menuThemeStateBadge" class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-sub)]">Scuro</span>
+            </button>
+
+            <!-- 2. Bluetooth Auto-Start -->
+            <button type="button" onclick="toggleBtSim(); closeQuickSettingsMenu();" id="btnHeaderBt" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-sm">📶</span>
+                <div>
+                  <div class="font-bold text-[var(--text-main)] text-xs">Bluetooth Auto-Start</div>
+                  <div class="text-[9.5px] text-[var(--text-muted)]">Avvia/Termina guida e salva sosta</div>
+                </div>
+              </div>
+              <span id="btHeaderLabel" class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">BT Auto</span>
+            </button>
+
+            <!-- 3. Tracciamento GPS Live Reale -->
+            <button type="button" onclick="toggleGpsLive(); closeQuickSettingsMenu();" id="btnHeaderGps" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-sm">🛰️</span>
+                <div>
+                  <div class="font-bold text-[var(--text-main)] text-xs">Tracciamento GPS Reale</div>
+                  <div class="text-[9.5px] text-[var(--text-muted)]">Km, tempo e L/100km in diretta</div>
+                </div>
+              </div>
+              <span id="gpsMenuStateBadge" class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> GPS
+              </span>
+            </button>
+
+            <!-- 4. Automazione Comandi Rapidi iOS (Opzione 4) -->
+            <button type="button" onclick="closeQuickSettingsMenu(); openModal('modalIosShortcuts');" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-sm">⚡</span>
+                <div>
+                  <div class="font-bold text-[var(--text-main)] text-xs">Automazione iOS (Opzione 4)</div>
+                  <div class="text-[9.5px] text-[var(--text-muted)]">Link Comandi Rapidi BT & Mappe</div>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">Link ➔</span>
+            </button>
+
+            <!-- 5. Importa Tragitti (CSV / OBD2 / App Esterne) -->
+            <button type="button" onclick="closeQuickSettingsMenu(); openModal('modalImportTrips');" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-sm">📥</span>
+                <div>
+                  <div class="font-bold text-[var(--text-main)] text-xs">Importa Tragitti (OBD2 / CSV)</div>
+                  <div class="text-[9.5px] text-[var(--text-muted)]">Carica da app esterne o testo</div>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">Importa</span>
+            </button>
+
+            <div class="border-t border-[var(--border-color)] my-1"></div>
+
+            <!-- 6. Aggiungi Nuova Auto -->
+            <button type="button" onclick="closeQuickSettingsMenu(); openModalAddCar();" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-sm">➕</span>
+                <div>
+                  <div class="font-bold text-[var(--text-main)] text-xs">Aggiungi Nuova Auto</div>
+                  <div class="text-[9.5px] text-[var(--text-muted)]">Inserisci un veicolo nel garage</div>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500 text-black">+ Auto</span>
+            </button>
+
+            <!-- 7. Modifica Auto Attiva -->
+            <button type="button" onclick="closeQuickSettingsMenu(); openModalEditCar(activeCarIndex);" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-zinc-500/15 border border-zinc-500/30 text-[var(--text-main)] flex items-center justify-center text-sm">✏️</span>
+                <div>
+                  <div class="font-bold text-[var(--text-main)] text-xs">Modifica Auto Attiva</div>
+                  <div id="menuEditCarSub" class="text-[9.5px] text-[var(--text-muted)]">Nome, consumo L/100km e Bluetooth</div>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-sub)]">Modifica</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -143,14 +239,9 @@
       <div class="space-y-1.5 pt-0.5">
         <div class="flex items-center justify-between px-1">
           <span id="garageHeaderLabel" class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Garage Personale (3 Veicoli)</span>
-          <div class="flex items-center gap-2">
-            <button onclick="openModalAddCar()" class="text-[10px] font-bold text-amber-500 hover:text-amber-400 flex items-center gap-1 transition py-0.5 active:scale-95">
-              <span>➕ Auto</span>
-            </button>
-            <button onclick="openModalEditCar(activeCarIndex)" class="text-[10px] font-semibold text-[var(--text-sub)] hover:text-amber-400 flex items-center gap-1 transition py-0.5">
-              <span>✏️ Modifica</span>
-            </button>
-          </div>
+          <button onclick="toggleQuickSettingsMenu(event)" class="text-[10px] font-semibold text-[var(--text-muted)] hover:text-amber-400 flex items-center gap-1 transition py-0.5">
+            <span>⚙️ Gestisci Auto & Strumenti</span>
+          </button>
         </div>
 
         <div id="garagePillsContainer" class="flex items-center gap-1.5 w-full overflow-x-auto pb-0.5 no-scrollbar">
@@ -503,14 +594,19 @@
 
       <!-- ==================== TAB 3: PERCORSI ==================== -->
       <section id="tab-trips" class="space-y-3 hidden">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-2">
           <div>
-            <h2 class="text-sm font-bold text-[var(--text-main)]">Diario Viaggi Personali</h2>
-            <p class="text-[11px] text-[var(--text-muted)]">Chilometri, consumi e tratte registrate</p>
+            <h2 class="text-sm font-bold text-[var(--text-main)]">Diario Viaggi & Tracciamento</h2>
+            <p class="text-[11px] text-[var(--text-muted)]">Km, tempo, L/100km dinamici e auto-start</p>
           </div>
-          <button onclick="openModal('modalTrip')" class="px-3 py-1.5 rounded-xl text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold transition active:scale-95">
-            + Nuovo Viaggio
-          </button>
+          <div class="flex items-center gap-1.5">
+            <button onclick="openModal('modalImportTrips')" class="px-2.5 py-1.5 rounded-xl text-xs bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-400 font-bold transition active:scale-95 flex items-center gap-1" title="Importa da OBD2, CSV o App Esterne">
+              <span>📥</span> <span>Importa</span>
+            </button>
+            <button onclick="openModal('modalTrip')" class="px-3 py-1.5 rounded-xl text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold transition active:scale-95">
+              + Viaggio
+            </button>
+          </div>
         </div>
 
         <!-- KPI Riepilogo Viaggi Auto Attiva -->
@@ -529,7 +625,7 @@
           </div>
         </div>
 
-        <!-- CARD AUTO-START BLUETOOTH -->
+        <!-- CARD AUTO-START BLUETOOTH & OPZIONE 4 -->
         <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/10 via-[var(--bg-card)] to-[var(--bg-card)] border border-indigo-500/30 shadow-sm space-y-3">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2.5">
@@ -538,51 +634,67 @@
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-[var(--text-main)]">Auto-Start Bluetooth</span>
+                  <span class="text-xs font-bold text-[var(--text-main)]">Auto-Start Bluetooth & GPS</span>
                   <span id="btActiveBadge" class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-zinc-750 text-zinc-300 border border-zinc-700">Standby</span>
                 </div>
-                <div class="text-[10px] text-[var(--text-muted)]">Vivavoce Associato: <b id="btDeviceNameLabel" class="text-indigo-400">VW BT 4821</b></div>
+                <div class="text-[10px] text-[var(--text-muted)]">Vivavoce Associato: <b id="btDeviceNameLabel" class="text-indigo-400">Bluetooth Auto 1</b></div>
               </div>
             </div>
 
-            <!-- Toggle Abilita/Disabilita -->
-            <label class="relative inline-flex items-center cursor-pointer" title="Attiva/Disattiva Auto-Start">
-              <input type="checkbox" id="toggleBtAutoStart" checked class="sr-only peer">
+            <!-- Toggle Abilita/Disabilita Persistente -->
+            <label class="relative inline-flex items-center cursor-pointer" title="Attiva/Disattiva Auto-Start Bluetooth">
+              <input type="checkbox" id="toggleBtAutoStart" onchange="toggleBtAutoStartPreference(this.checked)" checked class="sr-only peer">
               <div class="w-9 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
             </label>
           </div>
 
           <!-- Box Viaggio in corso quando connesso a BT -->
-          <div id="btLiveTripBox" class="hidden p-3 rounded-xl bg-indigo-500/15 border border-indigo-500/40 space-y-1">
+          <div id="btLiveTripBox" class="hidden p-3 rounded-xl bg-indigo-500/15 border border-indigo-500/40 space-y-2">
             <div class="flex justify-between items-center text-xs">
               <span class="text-indigo-400 font-bold flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"></span>
-                Tracciamento Background in Corso...
+                <span id="btLiveStatusModeLabel">GPS Reale + Orario Attivo...</span>
               </span>
               <span id="btLiveTimer" class="font-mono font-bold text-[var(--text-main)]">00:00</span>
             </div>
-            <div class="flex justify-between items-baseline">
-              <span class="text-[11px] text-[var(--text-muted)]">Distanza registrata:</span>
-              <span id="btLiveKm" class="text-lg font-black font-mono text-indigo-400">0.0 km</span>
+            <div class="grid grid-cols-3 gap-1.5 pt-1 text-center">
+              <div class="p-1.5 rounded-lg bg-black/25 border border-indigo-500/20">
+                <div class="text-[9px] text-[var(--text-muted)]">Distanza</div>
+                <div id="btLiveKm" class="text-xs font-black font-mono text-indigo-400">0.0 km</div>
+              </div>
+              <div class="p-1.5 rounded-lg bg-black/25 border border-indigo-500/20">
+                <div class="text-[9px] text-[var(--text-muted)]">Consumo Din.</div>
+                <div id="btLiveCons" class="text-xs font-black font-mono text-cyan-400">-- L/100</div>
+              </div>
+              <div class="p-1.5 rounded-lg bg-black/25 border border-indigo-500/20">
+                <div class="text-[9px] text-[var(--text-muted)]">Vel. Media</div>
+                <div id="btLiveSpeed" class="text-xs font-black font-mono text-amber-400">-- km/h</div>
+              </div>
+            </div>
+            <div class="flex justify-between items-center pt-0.5 text-[9.5px] text-[var(--text-muted)]">
+              <span id="btLiveGpsAccuracyLabel">🛰️ Sensore GPS in ascolto...</span>
+              <button type="button" onclick="addSimulatedBtKmStep()" class="px-2 py-0.5 rounded-md bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-semibold border border-indigo-500/30 active:scale-95 transition">
+                +1.5 km (Test)
+              </button>
             </div>
           </div>
 
-          <!-- Controlli di Simulazione Bluetooth -->
+          <!-- Controlli Bluetooth & Avvio Rapido -->
           <div class="grid grid-cols-2 gap-2.5 pt-0.5">
             <button id="btnBtConnect" onclick="triggerBtConnect()" class="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow-sm">
               <span>🚗</span>
-              <span>Connetti BT</span>
+              <span>Avvia Guida BT</span>
             </button>
             <button id="btnBtDisconnect" onclick="triggerBtDisconnect()" disabled class="py-2.5 px-3 rounded-xl bg-zinc-800 text-zinc-500 font-bold text-xs flex items-center justify-center gap-1.5 transition">
               <span>🅿️</span>
-              <span>Scollega & Sosta</span>
+              <span>Arrivo & Sosta</span>
             </button>
           </div>
 
           <div class="flex justify-between items-center pt-0.5 text-[10px] text-[var(--text-muted)]">
-            <span>Avvio automatico alla guida • Sosta salvata al distacco</span>
-            <button onclick="openModal('modalIosShortcuts')" class="text-indigo-400 hover:underline font-semibold flex items-center gap-0.5">
-              Guida iOS ⓘ
+            <span>Persistente anche a schermo spento • Calcolo L/100km</span>
+            <button onclick="openModal('modalIosShortcuts')" class="text-indigo-400 hover:underline font-bold flex items-center gap-0.5">
+              ⚡ Configura Auto-Start iOS ⓘ
             </button>
           </div>
         </div>
@@ -1375,12 +1487,29 @@
           </div>
           <div>
             <label class="block text-[var(--text-muted)] text-[10px] mb-0.5">Durata (min)</label>
-            <input type="number" id="tripInputDuration" value="30" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono">
+            <input type="number" id="tripInputDuration" value="30" oninput="updateTripModalEstimates()" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl px-2.5 py-1.5 font-mono">
+          </div>
+        </div>
+
+        <!-- Calcolo Dinamico Consumo L/100km da Km + Tempo (Personalizzabile) -->
+        <div class="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 space-y-1.5">
+          <div class="flex items-center justify-between text-[10.5px]">
+            <span class="text-blue-400 font-bold flex items-center gap-1">⚡ Consumo Calcolato (Km + Tempo)</span>
+            <span id="tripModalDynamicProfile" class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[9px] font-bold">Extraurbano (~70 km/h)</span>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-[10px] text-[var(--text-muted)]">
+              Stima dinamica: <b id="tripModalDynamicL100" class="text-cyan-400 font-mono">4,83 L/100km</b>
+            </div>
+            <div class="flex items-center gap-1">
+              <input type="number" step="0.01" id="tripInputCustomCons" placeholder="Auto" oninput="updateTripModalEstimates()" title="Lascia vuoto per il calcolo automatico da Km e Tempo, oppure inserisci L/100km manuale" class="w-20 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-lg px-2 py-1 text-[10.5px] font-mono text-right focus:outline-none focus:border-cyan-400">
+              <span class="text-[9.5px] text-[var(--text-muted)] font-mono">L/100</span>
+            </div>
           </div>
         </div>
 
         <div class="p-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--input-border)] flex justify-between items-center text-[11px]">
-          <span class="text-[var(--text-muted)]">Costo Carburante Stimato:</span>
+          <span class="text-[var(--text-muted)]">Carburante & Spesa Stimata:</span>
           <span id="tripModalEstFuel" class="font-bold text-amber-500 font-mono">€ 3,50</span>
         </div>
       </div>
@@ -1509,49 +1638,161 @@
     </div>
   </div>
 
-  <!-- Modal Guida Comandi Rapidi iOS -->
+  <!-- Modal Guida Comandi Rapidi iOS (Opzione 4 Completa con Link Deep-URL Auto-Generati) -->
   <div id="modalIosShortcuts" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3">
     <div class="bg-zinc-900 border border-zinc-750 rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl text-xs text-white max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
         <div class="flex items-center gap-2">
           <span class="text-xl">⚡</span>
           <div>
-            <h3 class="font-bold text-xs text-white">Automazione Bluetooth su iPhone</h3>
-            <p class="text-[10px] text-zinc-400">Come attivarlo nativamente con Comandi Rapidi</p>
+            <h3 class="font-bold text-xs text-white">Automazione Bluetooth & Mappe (Opzione 4)</h3>
+            <p class="text-[10px] text-zinc-400">Tracciamento 100% automatico con Comandi Rapidi iOS</p>
           </div>
         </div>
         <button onclick="closeModal('modalIosShortcuts')" class="text-zinc-400 hover:text-white p-1">✕</button>
       </div>
 
+      <!-- Selettore Auto per generare i Link Deep-URL personalizzati -->
+      <div class="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10.5px] font-bold text-indigo-300">🚗 Seleziona Auto per i Link:</span>
+          <select id="shortcutModalCarSelect" onchange="updateShortcutModalLinks()" class="bg-zinc-800 border border-zinc-700 text-white rounded-lg px-2 py-1 text-[10.5px] font-bold focus:outline-none focus:border-indigo-500">
+            <!-- Popolato da JS -->
+          </select>
+        </div>
+        <div class="text-[10px] text-zinc-400">
+          Vivavoce associato: <code id="shortcutModalBtName" class="text-indigo-400 font-bold">Bluetooth Auto 1</code>
+        </div>
+      </div>
+
       <div class="space-y-2.5 text-[11px] text-zinc-300">
-        <p>Grazie all'app nativa <b>Comandi Rapidi (Shortcuts)</b> di iOS, puoi far avviare e fermare l'app in totale autonomia anche con l'iPhone bloccato in tasca:</p>
-
-        <div class="p-2.5 rounded-xl bg-zinc-800/80 border border-zinc-700 space-y-1.5">
-          <div class="font-bold text-amber-400 flex items-center gap-1.5">
-            <span>1️⃣</span> <span>Automazione Avvio Viaggio (Salita in Auto)</span>
+        <!-- Step 1: Salita in Auto -->
+        <div class="p-3 rounded-xl bg-zinc-800/80 border border-zinc-700 space-y-2">
+          <div class="font-bold text-amber-400 flex items-center justify-between">
+            <span>1️⃣ Salita in Auto (Quando BT si connette)</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Auto-Start</span>
           </div>
-          <p class="text-[10px] text-zinc-400">
-            Apri <i>Comandi Rapidi</i> ➔ scheda <b>Automazione</b> ➔ <b>Crea automazione personale</b> ➔ Seleziona <b>Bluetooth</b> ➔ Dispositivo: <code>VW BT 4821</code> ➔ <i>Quando si connette</i> ➔ Azione: <b>Apri App Gasolio</b>.
+          <p class="text-[10px] text-zinc-400 leading-relaxed">
+            In <b>Comandi Rapidi</b> ➔ <b>Automazione</b> ➔ <b>Bluetooth</b> (scegli l'auto, <i>Quando si connette</i>, <i>Esegui immediatamente</i>) ➔ Aggiungi azione <b>Apri URL</b> e incolla questo link:
           </p>
+          <div class="flex items-center gap-1.5">
+            <input type="text" id="shortcutUrlStartInput" readonly class="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-[9.5px] font-mono text-amber-300 focus:outline-none">
+            <button type="button" onclick="copyShortcutLink('start')" class="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-[10px] active:scale-95 transition whitespace-nowrap">
+              📋 Copia
+            </button>
+          </div>
         </div>
 
-        <div class="p-2.5 rounded-xl bg-zinc-800/80 border border-zinc-700 space-y-1.5">
-          <div class="font-bold text-blue-400 flex items-center gap-1.5">
-            <span>2️⃣</span> <span>Automazione Sosta & Parcheggio (Discesa dall'Auto)</span>
+        <!-- Step 2: Discesa dall'Auto -->
+        <div class="p-3 rounded-xl bg-zinc-800/80 border border-zinc-700 space-y-2">
+          <div class="font-bold text-blue-400 flex items-center justify-between">
+            <span>2️⃣ Discesa dall'Auto (Quando BT si scollega)</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">Km + Sosta</span>
           </div>
-          <p class="text-[10px] text-zinc-400">
-            Crea una seconda automazione: <b>Bluetooth</b> ➔ Dispositivo: la tua auto ➔ <i>Quando si disconnette</i> ➔ Azione: <b>Salva posizione sosta & Termina viaggio</b>.
+          <p class="text-[10px] text-zinc-400 leading-relaxed">
+            Seconda automazione: <b>Bluetooth</b> ➔ <i>Quando si disconnette</i> (<i>Esegui immediatamente</i>) ➔ Azione <b>Apri URL</b> con questo link (calcola km stradali, minuti, <b>L/100km dinamico</b> e salva il parcheggio GPS):
           </p>
+          <div class="flex items-center gap-1.5">
+            <input type="text" id="shortcutUrlStopInput" readonly class="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-[9.5px] font-mono text-blue-300 focus:outline-none">
+            <button type="button" onclick="copyShortcutLink('stop')" class="px-2.5 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-white font-bold text-[10px] active:scale-95 transition whitespace-nowrap">
+              📋 Copia
+            </button>
+          </div>
         </div>
 
-        <div class="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400">
-          💡 <b>100% Senza Pensieri:</b> Non devi mai aprire l'app a mano. Salendo in auto la registrazione parte in background; spegnendo il motore la posizione del parcheggio viene salvata per non dimenticare mai dove hai lasciato l'auto.
+        <!-- Step 3: Link Diretto con Distanza Apple Mappe -->
+        <div class="p-3 rounded-xl bg-zinc-800/80 border border-zinc-700 space-y-2">
+          <div class="font-bold text-emerald-400 flex items-center justify-between">
+            <span>3️⃣ Tratta Diretta da Apple Mappe / OBD</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">1-Colpo</span>
+          </div>
+          <p class="text-[10px] text-zinc-400 leading-relaxed">
+            Se nel Comando Rapido usi l'azione <i>"Ottieni distanza"</i> di Mappe, puoi passare direttamente <code>km</code> e <code>min</code> nell'URL:
+          </p>
+          <div class="flex items-center gap-1.5">
+            <input type="text" id="shortcutUrlDirectInput" readonly class="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-[9.5px] font-mono text-emerald-300 focus:outline-none">
+            <button type="button" onclick="copyShortcutLink('direct')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-[10px] active:scale-95 transition whitespace-nowrap">
+              📋 Copia
+            </button>
+          </div>
+        </div>
+
+        <div id="shortcutCopyFeedback" class="hidden p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-center text-[10.5px] font-bold text-emerald-300">
+          ✓ Link copiato negli appunti! Incollalo in Comandi Rapidi.
         </div>
       </div>
 
       <button onclick="closeModal('modalIosShortcuts')" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">
-        Ho Capito
+        Chiudi e Attiva
       </button>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: IMPORTATORE SMART TRAGITTI (CSV / OBD2 / APP ESTERNE) ==================== -->
+  <div id="modalImportTrips" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3">
+    <div class="bg-[var(--modal-bg)] border border-[var(--border-color)] text-[var(--text-main)] rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl text-xs max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-base font-bold">
+            📥
+          </div>
+          <div>
+            <h3 class="font-bold text-xs text-[var(--text-main)]">Importa Tragitti Automatici</h3>
+            <p class="text-[9.5px] text-[var(--text-muted)]">Da OBD2 (Car Scanner), Driversnote, CSV o Testo</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modalImportTrips')" class="text-[var(--text-muted)] hover:text-[var(--text-main)] p-1">✕</button>
+      </div>
+
+      <div class="space-y-2.5">
+        <!-- Selettore Veicolo Destinazione -->
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-[var(--bg-sub)] border border-[var(--border-color)]">
+          <span class="text-[10.5px] font-bold text-[var(--text-muted)]">🚗 Salva tragitti su:</span>
+          <select id="importTripsCarSelect" class="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-cyan-500">
+            <!-- Popolato da JS -->
+          </select>
+        </div>
+
+        <!-- Caricamento File CSV / TXT -->
+        <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-[11px] text-cyan-400">📂 Carica File (.CSV / .TXT)</span>
+            <button type="button" onclick="loadSampleImportTripsData()" class="text-[10px] font-bold text-amber-400 hover:underline">
+              ⚡ Prova Esempio OBD2
+            </button>
+          </div>
+          <input type="file" id="importTripsFileInput" accept=".csv,.txt,.tsv" onchange="handleImportTripsFile(event)" class="w-full text-[10px] text-[var(--text-muted)] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-cyan-500 file:text-black hover:file:bg-cyan-400 cursor-pointer">
+        </div>
+
+        <!-- Area Testo / Incolla Rapido -->
+        <div class="space-y-1">
+          <div class="flex justify-between items-center text-[10px] text-[var(--text-muted)]">
+            <span>Oppure incolla righe (<code>Data, Tratta, Km, Minuti, L/100km opz.</code>):</span>
+            <button type="button" onclick="clearImportTripsInput()" class="hover:text-rose-400">Pulisci</button>
+          </div>
+          <textarea id="importTripsTextInput" rows="4" oninput="previewImportTripsData()" placeholder="Esempio:&#10;2026-11-12, Casa - Ufficio, 24.5, 28&#10;2026-11-11, Trasferta Cliente, 68.0, 45, 4.9" class="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-text)] rounded-xl p-2.5 text-[11px] font-mono focus:outline-none focus:border-cyan-500 resize-none"></textarea>
+        </div>
+
+        <!-- Anteprima Tragitti Rilevati con L/100km Calcolato -->
+        <div id="importTripsPreviewBox" class="hidden p-3 rounded-2xl bg-[var(--bg-sub)] border border-[var(--border-color)] space-y-2">
+          <div class="flex items-center justify-between border-b border-[var(--border-color)] pb-1.5">
+            <span id="importPreviewCountLabel" class="font-bold text-[11px] text-emerald-400">0 Tragitti pronti</span>
+            <span id="importPreviewSummaryLabel" class="text-[10px] font-mono text-[var(--text-muted)]">0 km • € 0,00</span>
+          </div>
+          <div id="importTripsPreviewList" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+            <!-- Popolato da JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button type="button" onclick="closeModal('modalImportTrips')" class="flex-1 py-2.5 rounded-xl bg-zinc-700/40 text-[var(--text-sub)] font-semibold text-xs">
+          Annulla
+        </button>
+        <button type="button" id="btnConfirmImportTrips" onclick="confirmImportTrips()" class="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs shadow-md active:scale-95 transition">
+          📥 Importa Tragitti
+        </button>
+      </div>
     </div>
   </div>
 

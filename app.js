@@ -320,14 +320,31 @@ let editingCarIndex = 0;
 let activeTab = 'dashboard';
 let chartMode = 'single'; // 'single' o 'all'
 let isDarkMode = localStorage.getItem(THEME_KEY) !== 'light';
-let btSession = { active: false, carIndex: 0, startTime: null, sec: 0, km: 0.0, interval: null };
+const BT_SESSION_STORAGE_KEY = 'idrive_bt_session_state_v1';
+const BT_AUTOSTART_PREF_KEY = 'idrive_bt_autostart_pref_v1';
 
-// GPS Tracking
+let btSession = {
+  active: false,
+  carIndex: 0,
+  startTime: null,
+  startTimestamp: 0,
+  sec: 0,
+  km: 0.0,
+  interval: null,
+  watchId: null,
+  startCoords: null,
+  lastCoords: null
+};
+
+// GPS Tracking Reale + Fallback
 let liveTracking = {
   active: false,
   timer: null,
+  startTimestamp: 0,
   seconds: 0,
-  km: 0.0
+  km: 0.0,
+  watchId: null,
+  lastCoords: null
 };
 
 function saveCars() {
@@ -336,6 +353,186 @@ function saveCars() {
   } catch (e) {
     console.error("Errore salvataggio:", e);
   }
+}
+
+// ==================== MENU RAPIDO UNIFICATO (3 STANGHETTE / INGRANAGGIO) ====================
+function toggleQuickSettingsMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('quickSettingsMenuDropdown');
+  if (!menu) return;
+  menu.classList.toggle('hidden');
+  updateHeaderMenuStatusUI();
+}
+
+function closeQuickSettingsMenu() {
+  const menu = document.getElementById('quickSettingsMenuDropdown');
+  if (menu) menu.classList.add('hidden');
+}
+
+function updateHeaderMenuStatusUI() {
+  const car = appCars[activeCarIndex];
+  const subEl = document.getElementById('menuEditCarSub');
+  if (subEl && car) {
+    const baseCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
+    subEl.innerText = `${car.name} • ${baseCons.toFixed(2).replace('.', ',')} L/100km • ${car.btDevice || 'BT'}`;
+  }
+
+  const themeBadge = document.getElementById('menuThemeStateBadge');
+  if (themeBadge) {
+    themeBadge.innerText = isDarkMode ? 'Scuro 🌙' : 'Chiaro ☀️';
+  }
+
+  const dot = document.getElementById('quickMenuActiveDot');
+  const pill = document.getElementById('headerLiveStatusPill');
+  const pillText = document.getElementById('headerLiveStatusText');
+  const isAnyLive = Boolean(btSession.active || liveTracking.active);
+
+  if (dot) dot.classList.toggle('hidden', !isAnyLive);
+  if (pill) {
+    if (isAnyLive) {
+      pill.classList.remove('hidden');
+      pill.classList.add('flex');
+      if (pillText) {
+        pillText.innerText = btSession.active ? `BT ${btSession.km.toFixed(1)}km` : `GPS ${liveTracking.km.toFixed(1)}km`;
+      }
+    } else {
+      pill.classList.add('hidden');
+      pill.classList.remove('flex');
+    }
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('quickSettingsMenuDropdown');
+    const btn = document.getElementById('btnQuickMenuToggle');
+    if (menu && !menu.classList.contains('hidden')) {
+      if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
+        menu.classList.add('hidden');
+      }
+    }
+  });
+}
+
+// ==================== CALCOLO DINAMICO CONSUMO L/100KM (KM + TEMPO + PROFILO GUIDA) ====================
+function getCarBaseFuelPrice(car) {
+  if (car && Array.isArray(car.refuels) && car.refuels.length > 0 && parseFloat(car.refuels[0].pricePerLiter) > 0) {
+    return parseFloat(car.refuels[0].pricePerLiter);
+  }
+  if (!car) return 1.759;
+  if (car.fuelType === 'Benzina') return 1.819;
+  if (car.fuelType === 'Ibrida') return 1.809;
+  if (car.fuelType === 'GPL') return 0.729;
+  if (car.fuelType === 'Metano') return 1.459;
+  if (car.fuelType === 'Elettrico' || car.fuelType === 'Elettrica') return 0.45;
+  return 1.759;
+}
+
+function calculateDynamicTripConsumption(car, kmInput, durationMinutesInput, customL100 = null) {
+  const defaultCons = car && car.fuelType === 'Ibrida' ? 4.46 : (car && car.fuelType === 'Benzina' ? 6.58 : 5.62);
+  const baseCons = (car && parseFloat(car.consumption) > 0) ? parseFloat(car.consumption) : defaultCons;
+  const km = Math.max(0, parseFloat(kmInput) || 0);
+  const durationMinutes = Math.max(1, parseFloat(durationMinutesInput) || 30);
+  const hours = durationMinutes / 60;
+  const avgSpeed = km > 0 && hours > 0 ? (km / hours) : 50;
+  const isHybrid = Boolean(car && car.fuelType === 'Ibrida');
+  const isPetrol = Boolean(car && car.fuelType === 'Benzina');
+
+  let factor = 1.0;
+  let profileLabel = 'Misto';
+
+  if (avgSpeed < 22) {
+    // Traffico urbano intenso / code / semafori
+    factor = isHybrid ? 1.08 : 1.32;
+    profileLabel = 'Traffico Urbano';
+  } else if (avgSpeed < 38) {
+    // Urbano scorrevole
+    factor = isHybrid ? 0.96 : 1.18;
+    profileLabel = 'Urbano';
+  } else if (avgSpeed < 56) {
+    // Misto urbano / tangenziale
+    factor = isHybrid ? 0.98 : 1.02;
+    profileLabel = 'Misto';
+  } else if (avgSpeed <= 92) {
+    // Extraurbano scorrevole (massimo rendimento termico)
+    factor = isHybrid ? 0.91 : 0.86;
+    profileLabel = 'Extraurbano Ottimale';
+  } else if (avgSpeed <= 112) {
+    // Superstrada / Veloce
+    factor = isHybrid ? 1.06 : 1.02;
+    profileLabel = 'Extraurbano Veloce';
+  } else {
+    // Autostrada (>112 km/h, resistenza aerodinamica v^2)
+    factor = isHybrid ? 1.22 : (isPetrol ? 1.19 : 1.15);
+    if (avgSpeed > 128) factor += 0.08;
+    profileLabel = 'Autostrada';
+  }
+
+  // Penalità motore freddo per micro-tragitti (< 4.5 km)
+  if (km > 0 && km < 4.5) {
+    factor *= 1.10;
+  }
+
+  let consumptionL100 = parseFloat((baseCons * factor).toFixed(2));
+  const parsedCustom = parseFloat(customL100);
+  if (!isNaN(parsedCustom) && parsedCustom > 0) {
+    consumptionL100 = parseFloat(parsedCustom.toFixed(2));
+    profileLabel = 'Personalizzato';
+  }
+
+  const deltaPct = Math.round(((consumptionL100 / baseCons) - 1) * 100);
+  const litersUsed = parseFloat((km * (consumptionL100 / 100)).toFixed(2));
+  const fuelPrice = getCarBaseFuelPrice(car);
+  const cost = parseFloat((litersUsed * fuelPrice).toFixed(2));
+
+  return {
+    consumptionL100,
+    baseCons,
+    avgSpeed: Math.max(5, Math.round(avgSpeed)),
+    profileLabel,
+    deltaPct,
+    litersUsed,
+    fuelPrice,
+    cost
+  };
+}
+
+// Formula geodetica di Haversine per calcolo km reali da coordinate GPS
+function calculateHaversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Raggio terrestre in km
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Calcolo distanza stradale reale tra punto di partenza e arrivo (OSRM con fallback Haversine x 1.26)
+async function fetchRoadDistanceKm(startCoords, endCoords) {
+  if (!startCoords || !endCoords) return 0;
+  const straightKm = calculateHaversineKm(startCoords.lat, startCoords.lng, endCoords.lat, endCoords.lng);
+  if (straightKm < 0.05) return 0;
+
+  try {
+    const controller = new AbortController();
+    const tId = setTimeout(() => controller.abort(), 3000);
+    const url = `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=false`;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(tId);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.routes && data.routes[0] && data.routes[0].distance) {
+        return parseFloat((data.routes[0].distance / 1000).toFixed(1));
+      }
+    }
+  } catch (e) {
+    console.warn("OSRM fallback su Haversine stradale:", e);
+  }
+  return parseFloat((straightKm * 1.26).toFixed(1));
 }
 
 // ==================== TEMA CHIARO / SCURO ====================
@@ -356,6 +553,7 @@ function applyAppTheme(dark) {
     body.classList.add('theme-light');
     if (emoji) emoji.innerText = "☀️";
   }
+  updateHeaderMenuStatusUI();
   drawExpenseChart();
   drawDriveHoursChart();
 }
@@ -1793,6 +1991,8 @@ function renderAll() {
   const btDevLabel = document.getElementById('btDeviceNameLabel');
   if (btDevLabel) btDevLabel.innerText = car.btDevice || ('Bluetooth ' + car.name);
 
+  updateHeaderMenuStatusUI();
+
   // Aggiorna componenti dinamici Garage
   renderGaragePills();
   renderGarageList();
@@ -2187,16 +2387,18 @@ function renderTrips(car) {
     const displayDate = formatTransactionDisplayDate(t);
     const tId = t.id || ('trip_' + idx);
     const kmNum = parseFloat(t.km) || 0;
-    const costNum = parseFloat(t.cost) || 0;
     const durNum = parseInt(t.durationMinutes) || 30;
-    const avgSpeed = durNum > 0 ? Math.round(kmNum / (durNum / 60)) : 50;
-    const carCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
-    const estLiters = (kmNum * (carCons / 100)).toFixed(1);
+    const dynInfo = calculateDynamicTripConsumption(car, kmNum, durNum, t.consumption);
+    const avgSpeed = t.avgSpeed || dynInfo.avgSpeed;
+    const tripConsL100 = dynInfo.consumptionL100;
+    const estLiters = (t.liters && parseFloat(t.liters) > 0) ? parseFloat(t.liters).toFixed(1) : dynInfo.litersUsed.toFixed(1);
+    const costNum = (t.cost !== undefined && parseFloat(t.cost) > 0) ? parseFloat(t.cost) : dynInfo.cost;
+    const profileTag = t.driveProfile || dynInfo.profileLabel;
 
     const isRoundTrip = (t.title || '').includes('A/R');
     const badgeType = isRoundTrip 
       ? '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">Andata & Ritorno</span>'
-      : '<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">Tratta Singola</span>';
+      : `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">${profileTag}</span>`;
 
     const wrapper = document.createElement('div');
     wrapper.className = "feed-swipe-wrapper relative overflow-hidden rounded-2xl select-none group touch-pan-y shadow-sm";
@@ -2219,10 +2421,12 @@ function renderTrips(car) {
             <span class="text-base">🛣️</span>
             <span class="text-xs font-black text-[var(--text-main)]">${t.title}</span>
           </div>
-          <div class="text-[10.5px] text-[var(--text-muted)] flex items-center gap-1.5 pl-6">
+          <div class="text-[10.5px] text-[var(--text-muted)] flex flex-wrap items-center gap-1.5 pl-6">
             <span>📅 ${displayDate}</span>
             <span>•</span>
             <span>⏱️ ${durNum} min (~${avgSpeed} km/h)</span>
+            <span>•</span>
+            <span class="text-cyan-400 font-semibold font-mono">⚡ ${tripConsL100.toFixed(2).replace('.', ',')} L/100km</span>
           </div>
         </div>
         ${badgeType}
@@ -2235,8 +2439,8 @@ function renderTrips(car) {
           <div class="text-sm font-black font-mono text-[var(--text-main)]">${kmNum} km</div>
         </div>
         <div>
-          <div class="text-[9.5px] text-[var(--text-muted)] font-medium">Carburante</div>
-          <div class="text-sm font-black font-mono text-cyan-400">💧 ~${estLiters} L</div>
+          <div class="text-[9.5px] text-[var(--text-muted)] font-medium">Consumo (${tripConsL100.toFixed(1).replace('.', ',')} L/100)</div>
+          <div class="text-sm font-black font-mono text-cyan-400">💧 ~${estLiters.replace('.', ',')} L</div>
         </div>
         <div>
           <div class="text-[9.5px] text-[var(--text-muted)] font-medium">Spesa Tratta</div>
@@ -2496,6 +2700,72 @@ function detectAndSaveParkingLocation(car, { showNotification = true, isAuto = f
   );
 }
 
+function isBtAutoStartEnabled() {
+  const pref = localStorage.getItem(BT_AUTOSTART_PREF_KEY);
+  return pref === null ? true : pref === 'true';
+}
+
+function toggleBtAutoStartPreference(enabled) {
+  localStorage.setItem(BT_AUTOSTART_PREF_KEY, enabled ? 'true' : 'false');
+  const toggleEl = document.getElementById('toggleBtAutoStart');
+  if (toggleEl) toggleEl.checked = Boolean(enabled);
+}
+
+function persistBtSessionState() {
+  try {
+    if (!btSession.active) {
+      localStorage.removeItem(BT_SESSION_STORAGE_KEY);
+      return;
+    }
+    const payload = {
+      active: true,
+      carIndex: btSession.carIndex,
+      startTimestamp: btSession.startTimestamp,
+      km: btSession.km,
+      startCoords: btSession.startCoords,
+      lastCoords: btSession.lastCoords
+    };
+    localStorage.setItem(BT_SESSION_STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn("Errore salvataggio sessione BT:", e);
+  }
+}
+
+function updateBtLiveUI() {
+  if (!btSession.active) return;
+  const car = appCars[btSession.carIndex] || appCars[activeCarIndex];
+  const elapsedSec = Math.max(1, Math.floor((Date.now() - (btSession.startTimestamp || Date.now())) / 1000));
+  btSession.sec = elapsedSec;
+
+  const m = Math.floor(elapsedSec / 60);
+  const s = elapsedSec % 60;
+  const timerEl = document.getElementById('btLiveTimer');
+  if (timerEl) timerEl.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+  const liveKmEl = document.getElementById('btLiveKm');
+  if (liveKmEl) liveKmEl.innerText = `${btSession.km.toFixed(1)} km`;
+
+  const estMin = Math.max(1, elapsedSec / 60);
+  const dyn = calculateDynamicTripConsumption(car, Math.max(0.2, btSession.km), estMin);
+
+  const liveConsEl = document.getElementById('btLiveCons');
+  if (liveConsEl) liveConsEl.innerText = `${dyn.consumptionL100.toFixed(2).replace('.', ',')} L/100`;
+
+  const liveSpeedEl = document.getElementById('btLiveSpeed');
+  if (liveSpeedEl) liveSpeedEl.innerText = btSession.km > 0.05 ? `${dyn.avgSpeed} km/h` : `In marcia`;
+
+  updateHeaderMenuStatusUI();
+}
+
+function addSimulatedBtKmStep() {
+  if (!btSession.active) return;
+  btSession.km = parseFloat((btSession.km + 1.5).toFixed(2));
+  const accEl = document.getElementById('btLiveGpsAccuracyLabel');
+  if (accEl) accEl.innerText = `🧪 +1.5 km aggiunti (Totale: ${btSession.km.toFixed(1)} km)`;
+  persistBtSessionState();
+  updateBtLiveUI();
+}
+
 function toggleBtSim() {
   if (btSession.active) {
     triggerBtDisconnect();
@@ -2504,17 +2774,60 @@ function toggleBtSim() {
   }
 }
 
-function triggerBtConnect() {
-  const car = appCars[activeCarIndex];
-  if (btSession.active) return;
+function startBtGpsWatcher() {
+  if (!navigator.geolocation) return;
+  if (btSession.watchId !== null) {
+    try { navigator.geolocation.clearWatch(btSession.watchId); } catch (e) {}
+    btSession.watchId = null;
+  }
 
-  btSession.active = true;
-  btSession.carIndex = activeCarIndex;
-  btSession.sec = 0;
-  btSession.km = 0.0;
-  btSession.startTime = new Date();
+  // Cattura punto iniziale
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (!btSession.startCoords) btSession.startCoords = c;
+      if (!btSession.lastCoords) btSession.lastCoords = c;
+      persistBtSessionState();
+    },
+    () => {},
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+  );
 
-  // UI updates
+  btSession.watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      if (!btSession.active) return;
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = Math.round(pos.coords.accuracy || 10);
+
+      const accEl = document.getElementById('btLiveGpsAccuracyLabel');
+      if (accEl) accEl.innerText = `🛰️ GPS Reale Attivo (±${acc}m)`;
+
+      if (!btSession.startCoords) {
+        btSession.startCoords = { lat, lng };
+      }
+      if (btSession.lastCoords && acc <= 75) {
+        const deltaKm = calculateHaversineKm(btSession.lastCoords.lat, btSession.lastCoords.lng, lat, lng);
+        // Filtra il rumore GPS da fermo (< 8 metri) e salti anomali (> 5 km in un singolo step)
+        if (deltaKm >= 0.008 && deltaKm < 5.0) {
+          btSession.km = parseFloat((btSession.km + deltaKm).toFixed(3));
+          btSession.lastCoords = { lat, lng };
+          persistBtSessionState();
+        }
+      } else if (!btSession.lastCoords) {
+        btSession.lastCoords = { lat, lng };
+      }
+      updateBtLiveUI();
+    },
+    (err) => {
+      const accEl = document.getElementById('btLiveGpsAccuracyLabel');
+      if (accEl) accEl.innerText = `⏱️ Orario attivo • Calcolo distanza all'arrivo`;
+    },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+  );
+}
+
+function applyBtConnectedUI(car) {
   const badge = document.getElementById('btActiveBadge');
   if (badge) {
     badge.className = "px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500 text-black animate-pulse";
@@ -2534,69 +2847,65 @@ function triggerBtConnect() {
     btnDisc.className = "py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow-sm";
   }
 
-  // Header BT button update
-  const btnHeaderBt = document.getElementById('btnHeaderBt');
-  if (btnHeaderBt) {
-    btnHeaderBt.className = "px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-500/20 border border-emerald-500 text-emerald-400 flex items-center gap-1.5 transition";
-    const label = document.getElementById('btHeaderLabel');
-    if (label) label.innerText = "In Viaggio...";
+  const label = document.getElementById('btHeaderLabel');
+  if (label) {
+    label.innerText = "In Viaggio 🟢";
+    label.className = "px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
   }
+  updateHeaderMenuStatusUI();
+}
+
+function triggerBtConnect(options = {}) {
+  const car = appCars[activeCarIndex];
+  if (btSession.active) return;
+
+  btSession.active = true;
+  btSession.carIndex = activeCarIndex;
+  btSession.startTimestamp = options.startTimestamp || Date.now();
+  btSession.startTime = new Date(btSession.startTimestamp);
+  btSession.sec = Math.max(0, Math.floor((Date.now() - btSession.startTimestamp) / 1000));
+  btSession.km = options.initialKm || 0.0;
+  btSession.startCoords = options.startCoords || null;
+  btSession.lastCoords = options.lastCoords || null;
+
+  persistBtSessionState();
+  applyBtConnectedUI(car);
+  startBtGpsWatcher();
+  updateBtLiveUI();
 
   // Notifica iOS / Banner
-  const banner = document.getElementById('iosNotificationBanner');
-  const msg = document.getElementById('notifBannerMessage');
-  if (banner && msg) {
-    msg.innerHTML = `📶 <b>Bluetooth Agganciato (${car.btDevice}):</b> Registrazione viaggio avviata automaticamente in background con <b>${car.name}</b>.`;
-    banner.classList.remove('hidden');
+  if (!options.silentBanner) {
+    const banner = document.getElementById('iosNotificationBanner');
+    const msg = document.getElementById('notifBannerMessage');
+    if (banner && msg) {
+      msg.innerHTML = `📶 <b>Bluetooth Agganciato (${car.btDevice}):</b> Tracciamento reale GPS + Orario avviato su <b>${car.name}</b>.`;
+      banner.classList.remove('hidden');
+      setTimeout(() => banner.classList.add('hidden'), 5000);
+    }
   }
 
-  // Intervallo di simulazione
+  if (btSession.interval) clearInterval(btSession.interval);
   btSession.interval = setInterval(() => {
-    btSession.sec += 1;
-    btSession.km += 0.05;
-    const m = Math.floor(btSession.sec / 60);
-    const s = btSession.sec % 60;
-    const timerEl = document.getElementById('btLiveTimer');
-    if (timerEl) timerEl.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    const liveKmEl = document.getElementById('btLiveKm');
-    if (liveKmEl) liveKmEl.innerText = `${btSession.km.toFixed(1)} km`;
+    updateBtLiveUI();
   }, 1000);
 }
 
-function triggerBtDisconnect() {
-  if (!btSession.active) return;
-  clearInterval(btSession.interval);
+async function triggerBtDisconnect(options = {}) {
+  if (!btSession.active && !options.forceDirectStop) return;
+  if (btSession.interval) clearInterval(btSession.interval);
+  if (btSession.watchId !== null && navigator.geolocation) {
+    try { navigator.geolocation.clearWatch(btSession.watchId); } catch (e) {}
+    btSession.watchId = null;
+  }
+
+  const carIdx = btSession.active ? btSession.carIndex : activeCarIndex;
+  const car = appCars[carIdx] || appCars[activeCarIndex];
+  const elapsedSec = btSession.startTimestamp ? Math.max(60, Math.floor((Date.now() - btSession.startTimestamp) / 1000)) : 240;
+  const savedStartCoords = btSession.startCoords;
+  const trackedKm = btSession.km || 0;
+
   btSession.active = false;
-
-  const car = appCars[btSession.carIndex];
-  const doneKm = Math.max(1.8, parseFloat(btSession.km.toFixed(1)));
-  const minutes = Math.max(2, Math.round(btSession.sec / 60) || 4);
-  const defaultCons = car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62);
-  const userCons = car.consumption || defaultCons;
-  const costTrip = (doneKm * userCons / 100) * 1.78;
-
-  // Salva viaggio nel diario con cattura esatta di data e ora
-  const now = new Date();
-  const isoDate = getSystemDateKey(now);
-  const timeStr = getSystemTimeKey(now);
-  const timestamp = now.getTime();
-  const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
-
-  car.currentOdo += Math.round(doneKm);
-  car.trips.unshift({
-    id: `trip_bt_${Date.now()}`,
-    title: `Tratta Auto-Start (${car.btDevice})`,
-    date: dateLabel,
-    isoDate,
-    time: timeStr,
-    timestamp,
-    km: doneKm,
-    durationMinutes: minutes,
-    cost: parseFloat(costTrip.toFixed(2))
-  });
-  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-  saveCars();
+  persistBtSessionState();
 
   // Reset UI
   const badge = document.getElementById('btActiveBadge');
@@ -2618,18 +2927,102 @@ function triggerBtDisconnect() {
     btnDisc.className = "py-2.5 px-3 rounded-xl bg-zinc-800 text-zinc-500 font-bold text-xs flex items-center justify-center gap-1.5";
   }
 
-  // Header BT button reset
-  const btnHeaderBt = document.getElementById('btnHeaderBt');
-  if (btnHeaderBt) {
-    btnHeaderBt.className = "px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-400 flex items-center gap-1.5 transition";
-    const label = document.getElementById('btHeaderLabel');
-    if (label) label.innerText = "BT Auto";
+  const label = document.getElementById('btHeaderLabel');
+  if (label) {
+    label.innerText = "BT Auto";
+    label.className = "px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30";
+  }
+  updateHeaderMenuStatusUI();
+
+  // Calcolo minuti reali e distanza effettiva (GPS watch, OSRM tra partenza/arrivo, o parametri URL Comandi Rapidi)
+  let minutes = options.overrideMinutes ? Math.max(1, Math.round(parseFloat(options.overrideMinutes))) : Math.max(1, Math.round(elapsedSec / 60));
+  let doneKm = options.overrideKm ? parseFloat(parseFloat(options.overrideKm).toFixed(1)) : parseFloat(trackedKm.toFixed(1));
+
+  // Se il telefono era bloccato in tasca durante la guida, calcola i km stradali tra partenza e arrivo
+  if (!options.overrideKm && doneKm < 0.3 && savedStartCoords && navigator.geolocation) {
+    try {
+      const endPos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+      });
+      const endCoords = { lat: endPos.coords.latitude, lng: endPos.coords.longitude };
+      const roadKm = await fetchRoadDistanceKm(savedStartCoords, endCoords);
+      if (roadKm >= 0.2) {
+        doneKm = roadKm;
+      }
+    } catch (e) {}
   }
 
+  // Se ancora 0 (es. test da fermo in casa), stima dai minuti trascorsi a 42 km/h medi (min 1.5 km)
+  if (!doneKm || doneKm < 0.2) {
+    doneKm = parseFloat(Math.max(1.5, (minutes / 60) * 42).toFixed(1));
+  }
+
+  const dyn = calculateDynamicTripConsumption(car, doneKm, minutes, options.overrideL100);
+
+  // Salva viaggio nel diario con cattura esatta di data, ora e L/100km dinamico
+  const now = new Date();
+  const isoDate = getSystemDateKey(now);
+  const timeStr = getSystemTimeKey(now);
+  const timestamp = now.getTime();
+  const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
+  const tripTitle = options.overrideTitle || `Tratta Auto-Start (${car.btDevice})`;
+
+  car.currentOdo += Math.round(doneKm);
+  car.trips.unshift({
+    id: `trip_bt_${Date.now()}`,
+    title: tripTitle,
+    date: dateLabel,
+    isoDate,
+    time: timeStr,
+    timestamp,
+    km: doneKm,
+    durationMinutes: minutes,
+    consumption: dyn.consumptionL100,
+    liters: dyn.litersUsed,
+    avgSpeed: dyn.avgSpeed,
+    driveProfile: dyn.profileLabel,
+    cost: dyn.cost
+  });
+  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  saveCars();
   renderAll();
 
   // Metodo 2: Rilevamento automatico sosta GPS all'arresto del veicolo
   detectAndSaveParkingLocation(car, { showNotification: true, isAuto: true });
+}
+
+function restorePersistedBtSession() {
+  const toggleEl = document.getElementById('toggleBtAutoStart');
+  if (toggleEl) toggleEl.checked = isBtAutoStartEnabled();
+
+  try {
+    const raw = localStorage.getItem(BT_SESSION_STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved && saved.active && saved.startTimestamp) {
+      if (typeof saved.carIndex === 'number' && appCars[saved.carIndex]) {
+        activeCarIndex = saved.carIndex;
+      }
+      triggerBtConnect({
+        startTimestamp: saved.startTimestamp,
+        initialKm: saved.km || 0,
+        startCoords: saved.startCoords || null,
+        lastCoords: saved.lastCoords || null,
+        silentBanner: true
+      });
+    }
+  } catch (e) {
+    console.warn("Ripristino sessione BT fallito:", e);
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && btSession.active) {
+      updateBtLiveUI();
+    }
+  });
 }
 
 // Switch delle 6 Schede di Navigazione
@@ -3130,6 +3523,8 @@ function openModal(id) {
     document.getElementById('tripInputTitle').placeholder = 'es. Percorso Lavoro A/R';
     document.getElementById('tripInputKm').value = '';
     document.getElementById('tripInputKm').placeholder = 'es. 25';
+    const customConsEl = document.getElementById('tripInputCustomCons');
+    if (customConsEl) customConsEl.value = '';
     
     const tDate = document.getElementById('tripInputDate');
     const tTime = document.getElementById('tripInputTime');
@@ -3141,6 +3536,10 @@ function openModal(id) {
 
     updateTripDatePreview();
     updateTripModalEstimates();
+  } else if (id === 'modalIosShortcuts') {
+    initShortcutModalCarSelect();
+  } else if (id === 'modalImportTrips') {
+    initImportTripsModal();
   } else if (id === 'modalPdfReport') {
     renderPdfReport();
   }
@@ -3468,6 +3867,7 @@ function runReceiptAnalysisAnimation() {
 
 function saveRefuelFromModal() {
   const car = appCars[activeCarIndex];
+  const prevOdo = car.currentOdo || 0;
   const km = parseInt(document.getElementById('refuelInputKm').value) || car.currentOdo;
   const l = parseFloat(document.getElementById('refuelInputLiters').value) || 0;
   const p = parseFloat(document.getElementById('refuelInputPricePerL').value) || 0;
@@ -3490,6 +3890,18 @@ function saveRefuelFromModal() {
 
   const timestamp = refuelDateObj.getTime();
   const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
+
+  // Calibrazione automatica Pieno-Pieno se ci sono km percorsi misurabili
+  let calibrationNote = '';
+  const deltaOdo = km - prevOdo;
+  if (prevOdo > 0 && deltaOdo >= 60 && deltaOdo <= 1500 && l > 3) {
+    const measuredL100 = (l / deltaOdo) * 100;
+    if (measuredL100 >= 2.5 && measuredL100 <= 18.0) {
+      const oldCons = parseFloat(car.consumption) || 5.62;
+      car.consumption = parseFloat(((oldCons * 0.65) + (measuredL100 * 0.35)).toFixed(2));
+      calibrationNote = ` • Consumo medio tarato a <b>${car.consumption.toFixed(2).replace('.', ',')} L/100km</b>`;
+    }
+  }
 
   car.currentOdo = Math.max(km, car.currentOdo);
   car.refuels.unshift({
@@ -3519,19 +3931,35 @@ function saveRefuelFromModal() {
   const banner = document.getElementById('iosNotificationBanner');
   const msg = document.getElementById('notifBannerMessage');
   if (banner && msg) {
-    msg.innerHTML = `⛽ <b>Rifornimento Registrato:</b> ${l} L (${dateLabel}) salvati per <b>${car.name}</b>.`;
+    msg.innerHTML = `⛽ <b>Rifornimento Registrato:</b> ${l} L (${dateLabel}) salvati per <b>${car.name}</b>${calibrationNote}.`;
     banner.classList.remove('hidden');
-    setTimeout(() => banner.classList.add('hidden'), 4500);
+    setTimeout(() => banner.classList.add('hidden'), 5000);
   }
 }
 
 function updateTripModalEstimates() {
   const car = appCars[activeCarIndex] || {};
-  const km = parseFloat(document.getElementById('tripInputKm').value) || 0;
-  const userCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
-  const fuelPrice = car.refuels.length > 0 && car.refuels[0].pricePerLiter ? parseFloat(car.refuels[0].pricePerLiter) : (car.fuelType === 'Benzina' ? 1.819 : (car.fuelType === 'Ibrida' ? 1.809 : 1.759));
-  const cost = km * (userCons / 100) * fuelPrice;
-  document.getElementById('tripModalEstFuel').innerText = '€ ' + cost.toFixed(2).replace('.', ',');
+  const km = parseFloat(document.getElementById('tripInputKm')?.value) || 0;
+  const dur = parseFloat(document.getElementById('tripInputDuration')?.value) || 30;
+  const customConsVal = document.getElementById('tripInputCustomCons')?.value;
+
+  const dyn = calculateDynamicTripConsumption(car, km, dur, customConsVal);
+
+  const profileEl = document.getElementById('tripModalDynamicProfile');
+  if (profileEl) {
+    profileEl.innerText = `${dyn.profileLabel} (~${dyn.avgSpeed} km/h)`;
+  }
+
+  const dynL100El = document.getElementById('tripModalDynamicL100');
+  if (dynL100El) {
+    const sign = dyn.deltaPct > 0 ? `+${dyn.deltaPct}%` : `${dyn.deltaPct}%`;
+    dynL100El.innerText = `${dyn.consumptionL100.toFixed(2).replace('.', ',')} L/100km (${sign})`;
+  }
+
+  const estFuelEl = document.getElementById('tripModalEstFuel');
+  if (estFuelEl) {
+    estFuelEl.innerText = `${dyn.litersUsed.toFixed(1).replace('.', ',')} L • € ${dyn.cost.toFixed(2).replace('.', ',')}`;
+  }
 }
 
 function saveTripFromModal() {
@@ -3539,6 +3967,7 @@ function saveTripFromModal() {
   const title = document.getElementById('tripInputTitle').value.trim() || 'Viaggio Personale';
   const km = parseFloat(document.getElementById('tripInputKm').value) || 0;
   const dur = parseInt(document.getElementById('tripInputDuration').value) || 30;
+  const customConsVal = document.getElementById('tripInputCustomCons')?.value;
 
   // Lettura e cattura accurata di data e ora
   const dateInput = document.getElementById('tripInputDate');
@@ -3558,9 +3987,7 @@ function saveTripFromModal() {
   const timestamp = tripDateObj.getTime();
   const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
 
-  const userCons = parseFloat(car.consumption) || (car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62));
-  const fuelPrice = car.refuels.length > 0 && car.refuels[0].pricePerLiter ? parseFloat(car.refuels[0].pricePerLiter) : (car.fuelType === 'Benzina' ? 1.819 : (car.fuelType === 'Ibrida' ? 1.809 : 1.759));
-  const cost = km * (userCons / 100) * fuelPrice;
+  const dyn = calculateDynamicTripConsumption(car, km, dur, customConsVal);
 
   car.currentOdo += Math.round(km);
   car.trips.unshift({
@@ -3572,7 +3999,11 @@ function saveTripFromModal() {
     timestamp,
     km,
     durationMinutes: dur,
-    cost: parseFloat(cost.toFixed(2))
+    consumption: dyn.consumptionL100,
+    liters: dyn.litersUsed,
+    avgSpeed: dyn.avgSpeed,
+    driveProfile: dyn.profileLabel,
+    cost: dyn.cost
   });
 
   // Ordinamento cronologico garantito
@@ -3586,13 +4017,13 @@ function saveTripFromModal() {
   const banner = document.getElementById('iosNotificationBanner');
   const msg = document.getElementById('notifBannerMessage');
   if (banner && msg) {
-    msg.innerHTML = `🛣️ <b>Viaggio Registrato:</b> ${km} km (${dateLabel}) salvati per <b>${car.name}</b>.`;
+    msg.innerHTML = `🛣️ <b>Viaggio Registrato:</b> ${km} km in ${dur} min • <b>${dyn.consumptionL100.toFixed(2).replace('.', ',')} L/100km</b> (${dyn.profileLabel}) per <b>${car.name}</b>.`;
     banner.classList.remove('hidden');
-    setTimeout(() => banner.classList.add('hidden'), 4500);
+    setTimeout(() => banner.classList.add('hidden'), 5000);
   }
 }
 
-// GPS Tracking Simulato
+// GPS Tracking Reale (con fallback se indoor)
 function toggleGpsLive() {
   if (liveTracking.active) stopGpsLive();
   else startGpsLive();
@@ -3602,59 +4033,113 @@ function startGpsLive() {
   liveTracking.active = true;
   liveTracking.km = 0.0;
   liveTracking.seconds = 0;
-  document.getElementById('liveGpsBanner').classList.remove('hidden');
-  document.getElementById('btnHeaderGps').classList.add('bg-red-500', 'text-white');
-  document.getElementById('btnHeaderGps').innerText = '■ Stop GPS';
+  liveTracking.startTimestamp = Date.now();
+  liveTracking.lastCoords = null;
+
+  const liveBanner = document.getElementById('liveGpsBanner');
+  if (liveBanner) liveBanner.classList.remove('hidden');
+
+  const gpsBadge = document.getElementById('gpsMenuStateBadge');
+  if (gpsBadge) {
+    gpsBadge.className = "px-2 py-0.5 rounded-lg text-[10px] font-bold bg-red-500 text-white flex items-center gap-1";
+    gpsBadge.innerHTML = `■ Stop GPS`;
+  }
+  updateHeaderMenuStatusUI();
+
+  if (navigator.geolocation) {
+    if (liveTracking.watchId !== null) {
+      try { navigator.geolocation.clearWatch(liveTracking.watchId); } catch (e) {}
+    }
+    liveTracking.watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!liveTracking.active) return;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const acc = pos.coords.accuracy || 10;
+        if (liveTracking.lastCoords && acc <= 75) {
+          const dKm = calculateHaversineKm(liveTracking.lastCoords.lat, liveTracking.lastCoords.lng, lat, lng);
+          if (dKm >= 0.008 && dKm < 5.0) {
+            liveTracking.km = parseFloat((liveTracking.km + dKm).toFixed(3));
+            liveTracking.lastCoords = { lat, lng };
+          }
+        } else if (!liveTracking.lastCoords) {
+          liveTracking.lastCoords = { lat, lng };
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+    );
+  }
 
   liveTracking.timer = setInterval(() => {
-    liveTracking.seconds += 1;
-    liveTracking.km += 0.03;
-    const m = Math.floor(liveTracking.seconds / 60).toString().padStart(2, '0');
-    const s = (liveTracking.seconds % 60).toString().padStart(2, '0');
-    document.getElementById('gpsLiveTimer').innerText = `${m}:${s}`;
-    document.getElementById('gpsLiveKm').innerText = liveTracking.km.toFixed(2);
+    const elapsed = Math.max(1, Math.floor((Date.now() - liveTracking.startTimestamp) / 1000));
+    liveTracking.seconds = elapsed;
+    const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+    const s = (elapsed % 60).toString().padStart(2, '0');
+    const timerEl = document.getElementById('gpsLiveTimer');
+    if (timerEl) timerEl.innerText = `${m}:${s}`;
+    const kmEl = document.getElementById('gpsLiveKm');
+    if (kmEl) kmEl.innerText = liveTracking.km.toFixed(2);
+    updateHeaderMenuStatusUI();
   }, 1000);
 }
 
 function stopGpsLive() {
   if (!liveTracking.active) return;
   clearInterval(liveTracking.timer);
+  if (liveTracking.watchId !== null && navigator.geolocation) {
+    try { navigator.geolocation.clearWatch(liveTracking.watchId); } catch (e) {}
+    liveTracking.watchId = null;
+  }
   liveTracking.active = false;
-  document.getElementById('liveGpsBanner').classList.add('hidden');
-  document.getElementById('btnHeaderGps').classList.remove('bg-red-500', 'text-white');
-  document.getElementById('btnHeaderGps').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> GPS Live`;
+
+  const liveBanner = document.getElementById('liveGpsBanner');
+  if (liveBanner) liveBanner.classList.add('hidden');
+
+  const gpsBadge = document.getElementById('gpsMenuStateBadge');
+  if (gpsBadge) {
+    gpsBadge.className = "px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1";
+    gpsBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> GPS`;
+  }
+  updateHeaderMenuStatusUI();
 
   const car = appCars[activeCarIndex];
-  const doneKm = parseFloat(liveTracking.km.toFixed(1));
-  if (doneKm > 0) {
-    const defaultCons = car.fuelType === 'Ibrida' ? 4.46 : (car.fuelType === 'Benzina' ? 6.58 : 5.62);
-    const userCons = car.consumption || defaultCons;
-    const costTrip = (doneKm * userCons / 100) * 1.78;
-
-    // Cattura esatta di data e ora al termine del tragitto
-    const now = new Date();
-    const isoDate = getSystemDateKey(now);
-    const timeStr = getSystemTimeKey(now);
-    const timestamp = now.getTime();
-    const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
-
-    car.currentOdo += Math.round(doneKm);
-    car.trips.unshift({
-      id: 'trip_' + Date.now(),
-      title: 'Percorso GPS Tracciato',
-      date: dateLabel,
-      isoDate,
-      time: timeStr,
-      timestamp,
-      km: doneKm,
-      durationMinutes: Math.max(1, Math.round(liveTracking.seconds / 60)),
-      cost: parseFloat(costTrip.toFixed(2))
-    });
-    car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-    saveCars();
-    renderAll();
+  const elapsedSec = Math.max(60, liveTracking.seconds || 60);
+  const durMin = Math.max(1, Math.round(elapsedSec / 60));
+  let doneKm = parseFloat(liveTracking.km.toFixed(1));
+  if (doneKm < 0.2) {
+    doneKm = parseFloat(Math.max(1.2, (durMin / 60) * 40).toFixed(1));
   }
+
+  const dyn = calculateDynamicTripConsumption(car, doneKm, durMin);
+
+  // Cattura esatta di data e ora al termine del tragitto
+  const now = new Date();
+  const isoDate = getSystemDateKey(now);
+  const timeStr = getSystemTimeKey(now);
+  const timestamp = now.getTime();
+  const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
+
+  car.currentOdo += Math.round(doneKm);
+  car.trips.unshift({
+    id: 'trip_' + Date.now(),
+    title: 'Percorso GPS Tracciato',
+    date: dateLabel,
+    isoDate,
+    time: timeStr,
+    timestamp,
+    km: doneKm,
+    durationMinutes: durMin,
+    consumption: dyn.consumptionL100,
+    liters: dyn.litersUsed,
+    avgSpeed: dyn.avgSpeed,
+    driveProfile: dyn.profileLabel,
+    cost: dyn.cost
+  });
+  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  saveCars();
+  renderAll();
 
   // Metodo 2: Rilevamento automatico sosta GPS all'arresto del viaggio
   detectAndSaveParkingLocation(car, { showNotification: true, isAuto: true });
@@ -4107,17 +4592,13 @@ function saveExtractedTripToDatabase(extractedData) {
     dateLabel = `${dayNum} ${monthShort}, ${timePart}`;
   }
   
-  // Costo stimato in base al tipo carburante
-  let costPerKm = 0.10;
-  if (car.fuelType === 'Ibrida') costPerKm = 0.08;
-  else if (car.fuelType === 'Elettrica') costPerKm = 0.05;
-  else if (car.fuelType === 'Benzina') costPerKm = 0.12;
-  const tripCost = parseFloat((kmNum * costPerKm).toFixed(2));
+  // Calcolo consumo dinamico L/100km da Km e Tempo
+  const dyn = calculateDynamicTripConsumption(car, kmNum, tempoNum);
 
   // 1. Aggiornamento contachilometri totale dell'auto
   car.currentOdo = (car.currentOdo || 0) + Math.round(kmNum);
 
-  // 2. Inserimento del viaggio nella cronologia dell'auto con data e ora esatte
+  // 2. Inserimento del viaggio nella cronologia dell'auto con data, ora e L/100km dinamico
   if (!car.trips) car.trips = [];
   car.trips.unshift({
     id: `trip_gemini_${Date.now()}`,
@@ -4128,9 +4609,14 @@ function saveExtractedTripToDatabase(extractedData) {
     timestamp: finalTimestamp,
     km: kmNum,
     durationMinutes: tempoNum,
-    cost: tripCost,
+    consumption: dyn.consumptionL100,
+    liters: dyn.litersUsed,
+    avgSpeed: dyn.avgSpeed,
+    driveProfile: dyn.profileLabel,
+    cost: dyn.cost,
     source: 'gemini_ai'
   });
+  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
   // 3. Persistenza su localStorage e aggiornamento UI
   saveCars();
@@ -4209,14 +4695,445 @@ function replayVoiceConfirmation() {
   }
 }
 
+// ==================== OPZIONE 4: AUTOMAZIONE COMANDI RAPIDI iOS & BRIDGE BLUETOOTH NATIVO ====================
+function getBaseAppUrlForShortcuts() {
+  if (typeof window === 'undefined') return 'https://ponzianogabriele144-sketch.github.io/iDrive/';
+  if (window.location.protocol === 'file:') {
+    return 'idrive://action';
+  }
+  const cleanOrigin = window.location.origin + window.location.pathname;
+  return cleanOrigin;
+}
+
+function initShortcutModalCarSelect() {
+  const selectEl = document.getElementById('shortcutModalCarSelect');
+  if (!selectEl) return;
+  selectEl.innerHTML = appCars.map((c, idx) => `<option value="${idx}" ${idx === activeCarIndex ? 'selected' : ''}>${c.name} (${c.fuelType})</option>`).join('');
+  updateShortcutModalLinks();
+}
+
+function updateShortcutModalLinks() {
+  const selectEl = document.getElementById('shortcutModalCarSelect');
+  const carIdx = selectEl ? (parseInt(selectEl.value, 10) || 0) : activeCarIndex;
+  const car = appCars[carIdx] || appCars[activeCarIndex];
+  const btNameEl = document.getElementById('shortcutModalBtName');
+  if (btNameEl && car) {
+    btNameEl.innerText = car.btDevice || `Bluetooth ${car.name}`;
+  }
+
+  const base = getBaseAppUrlForShortcuts();
+  const sep = base.includes('?') ? '&' : '?';
+
+  const startIn = document.getElementById('shortcutUrlStartInput');
+  const stopIn = document.getElementById('shortcutUrlStopInput');
+  const directIn = document.getElementById('shortcutUrlDirectInput');
+
+  if (startIn) startIn.value = `${base}${sep}bt=start&car=${carIdx}`;
+  if (stopIn) stopIn.value = `${base}${sep}bt=stop&car=${carIdx}`;
+  if (directIn) directIn.value = `${base}${sep}action=add_trip&car=${carIdx}&km=25&min=30&title=Tratta+Auto`;
+}
+
+function copyShortcutLink(type) {
+  let inputId = 'shortcutUrlStartInput';
+  if (type === 'stop') inputId = 'shortcutUrlStopInput';
+  else if (type === 'direct') inputId = 'shortcutUrlDirectInput';
+
+  const el = document.getElementById(inputId);
+  if (!el) return;
+
+  const text = el.value;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  } else {
+    el.select();
+    try { document.execCommand('copy'); } catch (e) {}
+  }
+
+  const fb = document.getElementById('shortcutCopyFeedback');
+  if (fb) {
+    fb.classList.remove('hidden');
+    setTimeout(() => fb.classList.add('hidden'), 3000);
+  }
+}
+
+function resolveCarIndexFromParam(carParam, btDeviceNameParam) {
+  if (btDeviceNameParam) {
+    const cleanBt = btDeviceNameParam.trim().toLowerCase();
+    const matchedIdx = appCars.findIndex(c => (c.btDevice || '').toLowerCase() === cleanBt || (c.btDevice || '').toLowerCase().includes(cleanBt));
+    if (matchedIdx !== -1) return matchedIdx;
+  }
+  if (carParam !== null && carParam !== undefined && carParam !== '') {
+    const parsedIdx = parseInt(carParam, 10);
+    if (!isNaN(parsedIdx) && appCars[parsedIdx]) return parsedIdx;
+    const lowerName = String(carParam).trim().toLowerCase();
+    const byName = appCars.findIndex(c => (c.name || '').toLowerCase() === lowerName);
+    if (byName !== -1) return byName;
+  }
+  return activeCarIndex;
+}
+
+// Gestore Deep-Link da Comandi Rapidi iOS o URL Scheme nativo (idrive://?bt=start / ?bt=stop / ?action=add_trip)
+function handleIncomingAutomationUrl(customQueryString = null) {
+  try {
+    const queryStr = customQueryString !== null ? customQueryString : (typeof window !== 'undefined' ? window.location.search : '');
+    if (!queryStr || queryStr.length < 2) return;
+
+    const params = new URLSearchParams(queryStr.startsWith('?') ? queryStr : '?' + queryStr);
+    const btCmd = (params.get('bt') || '').toLowerCase();
+    const actionCmd = (params.get('action') || '').toLowerCase();
+    const carParam = params.get('car');
+    const btNameParam = params.get('bt_name') || params.get('device');
+
+    if (!btCmd && !actionCmd) return;
+
+    const targetCarIdx = resolveCarIndexFromParam(carParam, btNameParam);
+    if (appCars[targetCarIdx] && targetCarIdx !== activeCarIndex) {
+      activeCarIndex = targetCarIdx;
+    }
+
+    const kmParam = params.get('km') || params.get('distanza');
+    const minParam = params.get('min') || params.get('minuti') || params.get('durata');
+    const l100Param = params.get('l100') || params.get('consumo');
+    const titleParam = params.get('title') || params.get('percorso');
+
+    if (btCmd === 'start' || actionCmd === 'bt_connect' || actionCmd === 'start') {
+      switchTab('trips');
+      triggerBtConnect({ silentBanner: false });
+    } else if (btCmd === 'stop' || actionCmd === 'bt_disconnect' || actionCmd === 'stop') {
+      switchTab('trips');
+      triggerBtDisconnect({
+        forceDirectStop: true,
+        overrideKm: kmParam,
+        overrideMinutes: minParam,
+        overrideL100: l100Param,
+        overrideTitle: titleParam
+      });
+    } else if (actionCmd === 'add_trip' && kmParam) {
+      const car = appCars[activeCarIndex];
+      const kmVal = Math.max(0.2, parseFloat(String(kmParam).replace(',', '.')) || 10);
+      const minVal = Math.max(1, parseInt(minParam, 10) || Math.round((kmVal / 50) * 60));
+      const dyn = calculateDynamicTripConsumption(car, kmVal, minVal, l100Param);
+      const now = new Date();
+      const isoDate = getSystemDateKey(now);
+      const timeStr = getSystemTimeKey(now);
+      const timestamp = now.getTime();
+      const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: timeStr });
+
+      car.currentOdo += Math.round(kmVal);
+      car.trips.unshift({
+        id: `trip_auto_${Date.now()}`,
+        title: titleParam || `Tratta Automatica (${car.name})`,
+        date: dateLabel,
+        isoDate,
+        time: timeStr,
+        timestamp,
+        km: parseFloat(kmVal.toFixed(1)),
+        durationMinutes: minVal,
+        consumption: dyn.consumptionL100,
+        liters: dyn.litersUsed,
+        avgSpeed: dyn.avgSpeed,
+        driveProfile: dyn.profileLabel,
+        cost: dyn.cost
+      });
+      car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      saveCars();
+      switchTab('trips');
+      renderAll();
+      detectAndSaveParkingLocation(car, { showNotification: true, isAuto: true });
+    }
+
+    // Ripulisce i parametri URL per evitare esecuzioni duplicate al refresh
+    if (customQueryString === null && typeof window !== 'undefined' && window.history && window.history.replaceState) {
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  } catch (e) {
+    console.warn("Errore gestione URL automazione:", e);
+  }
+}
+
+// Bridge chiamato dal codice Swift nativo (AVAudioSession.routeChangeNotification in ContentView.swift)
+if (typeof window !== 'undefined') {
+  window.handleIncomingAutomationUrl = handleIncomingAutomationUrl;
+  window.onNativeBtRouteChange = function(eventType, deviceName) {
+    if (!isBtAutoStartEnabled()) return;
+    const matchedIdx = resolveCarIndexFromParam(null, deviceName);
+    if (appCars[matchedIdx]) {
+      activeCarIndex = matchedIdx;
+    }
+    if (eventType === 'connect') {
+      triggerBtConnect();
+    } else if (eventType === 'disconnect') {
+      triggerBtDisconnect();
+    }
+  };
+}
+
+// ==================== IMPORTATORE SMART TRAGITTI (OBD2 / CSV / APP ESTERNE / TESTO) ====================
+let pendingImportedTrips = [];
+
+function initImportTripsModal() {
+  const selectEl = document.getElementById('importTripsCarSelect');
+  if (selectEl) {
+    selectEl.innerHTML = appCars.map((c, idx) => `<option value="${idx}" ${idx === activeCarIndex ? 'selected' : ''}>${c.name} (${c.fuelType})</option>`).join('');
+    selectEl.onchange = () => previewImportTripsData();
+  }
+  previewImportTripsData();
+}
+
+function clearImportTripsInput() {
+  const txt = document.getElementById('importTripsTextInput');
+  const fileIn = document.getElementById('importTripsFileInput');
+  if (txt) txt.value = '';
+  if (fileIn) fileIn.value = '';
+  pendingImportedTrips = [];
+  previewImportTripsData();
+}
+
+function loadSampleImportTripsData() {
+  const todayIso = getSystemDateKey(new Date());
+  const yestDate = new Date();
+  yestDate.setDate(yestDate.getDate() - 1);
+  const yestIso = getSystemDateKey(yestDate);
+
+  const sampleText = [
+    `Data, Tratta, Km, Minuti, L/100km`,
+    `${todayIso}, Casa ➔ Ufficio (Urbano), 14.5, 29`,
+    `${todayIso}, Ufficio ➔ Cliente Extraurbano, 48.0, 38`,
+    `${yestIso}, Autostrada A4 Trasferta, 92.0, 44, 6.25`
+  ].join('\n');
+
+  const txt = document.getElementById('importTripsTextInput');
+  if (txt) {
+    txt.value = sampleText;
+    previewImportTripsData();
+  }
+}
+
+function handleImportTripsFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const content = e.target.result || '';
+    const txt = document.getElementById('importTripsTextInput');
+    if (txt) {
+      txt.value = content;
+      previewImportTripsData();
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseImportTripsText(rawText, car) {
+  if (!rawText || !rawText.trim()) return [];
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) return [];
+
+  const results = [];
+  const now = new Date();
+  const defaultIso = getSystemDateKey(now);
+  const defaultTime = getSystemTimeKey(now);
+
+  // Rileva se la prima riga è un'intestazione CSV (OBD2 / Driversnote / Excel)
+  let startIdx = 0;
+  let colMap = null;
+  const firstLower = lines[0].toLowerCase();
+  if (firstLower.includes('km') || firstLower.includes('dist') || firstLower.includes('date') || firstLower.includes('data')) {
+    const sep = lines[0].includes(';') ? ';' : (lines[0].includes('\t') ? '\t' : ',');
+    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase());
+    const hasNumericOnly = headers.some(h => /^\d+([.,]\d+)?$/.test(h));
+    if (!hasNumericOnly) {
+      startIdx = 1;
+      colMap = {
+        sep,
+        dateIdx: headers.findIndex(h => h.includes('data') || h.includes('date') || h.includes('start')),
+        titleIdx: headers.findIndex(h => h.includes('tratta') || h.includes('percorso') || h.includes('route') || h.includes('title') || h.includes('dest') || h.includes('note')),
+        kmIdx: headers.findIndex(h => h === 'km' || h.includes('dist') || h.includes('chilom') || h.includes('odo')),
+        minIdx: headers.findIndex(h => h.includes('min') || h.includes('dur') || h.includes('temp') || h.includes('time')),
+        consIdx: headers.findIndex(h => h.includes('100') || h.includes('cons') || h.includes('fuel') || h.includes('avg'))
+      };
+    }
+  }
+
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i];
+    const sep = colMap ? colMap.sep : (line.includes(';') ? ';' : (line.includes('\t') ? '\t' : ','));
+    const parts = line.split(sep).map(p => p.trim().replace(/^["']|["']$/g, ''));
+    if (parts.length < 2) continue;
+
+    let isoDate = defaultIso;
+    let title = 'Tragitto Importato';
+    let km = 0;
+    let minutes = 0;
+    let customCons = null;
+
+    if (colMap && colMap.kmIdx !== -1) {
+      if (colMap.dateIdx !== -1 && parts[colMap.dateIdx]) {
+        const dRaw = parts[colMap.dateIdx].split(' ')[0];
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dRaw)) isoDate = dRaw;
+      }
+      if (colMap.titleIdx !== -1 && parts[colMap.titleIdx]) title = parts[colMap.titleIdx];
+      km = parseFloat((parts[colMap.kmIdx] || '0').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+      if (colMap.minIdx !== -1 && parts[colMap.minIdx]) {
+        minutes = parseFloat(parts[colMap.minIdx].replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+      }
+      if (colMap.consIdx !== -1 && parts[colMap.consIdx]) {
+        const cVal = parseFloat(parts[colMap.consIdx].replace(',', '.').replace(/[^\d.]/g, ''));
+        if (cVal > 0) customCons = cVal;
+      }
+    } else {
+      // Formato flessibile: [Data opzionale], Tratta, Km, Minuti, [L/100km opzionale]
+      let cursor = 0;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(parts[0])) {
+        isoDate = parts[0];
+        cursor = 1;
+      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(parts[0])) {
+        const [dd, mm, yyyy] = parts[0].split('/');
+        isoDate = `${yyyy}-${mm}-${dd}`;
+        cursor = 1;
+      }
+
+      if (parts.length - cursor >= 2) {
+        // Verifica se parts[cursor] è un testo (Titolo) o subito un numero (Km)
+        if (isNaN(parseFloat(parts[cursor]))) {
+          title = parts[cursor];
+          km = parseFloat((parts[cursor + 1] || '0').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+          minutes = parseFloat((parts[cursor + 2] || '0').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+          if (parts[cursor + 3]) {
+            const cVal = parseFloat(parts[cursor + 3].replace(',', '.').replace(/[^\d.]/g, ''));
+            if (cVal > 0) customCons = cVal;
+          }
+        } else {
+          km = parseFloat((parts[cursor] || '0').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+          minutes = parseFloat((parts[cursor + 1] || '0').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+          if (parts[cursor + 2]) {
+            const cVal = parseFloat(parts[cursor + 2].replace(',', '.').replace(/[^\d.]/g, ''));
+            if (cVal > 0) customCons = cVal;
+          }
+        }
+      }
+    }
+
+    if (km <= 0) continue;
+    if (minutes <= 0) {
+      minutes = Math.max(2, Math.round((km / 50) * 60));
+    } else {
+      minutes = Math.max(1, Math.round(minutes));
+    }
+
+    const dyn = calculateDynamicTripConsumption(car, km, minutes, customCons);
+    const dateObj = new Date(isoDate + 'T' + defaultTime + ':00');
+    const timestamp = isNaN(dateObj.getTime()) ? Date.now() : dateObj.getTime();
+    const dateLabel = formatTransactionDisplayDate({ timestamp, isoDate, time: defaultTime });
+
+    results.push({
+      id: `trip_imp_${Date.now()}_${i}`,
+      title,
+      date: dateLabel,
+      isoDate,
+      time: defaultTime,
+      timestamp,
+      km: parseFloat(km.toFixed(1)),
+      durationMinutes: minutes,
+      consumption: dyn.consumptionL100,
+      liters: dyn.litersUsed,
+      avgSpeed: dyn.avgSpeed,
+      driveProfile: dyn.profileLabel,
+      cost: dyn.cost
+    });
+  }
+
+  return results;
+}
+
+function previewImportTripsData() {
+  const txtEl = document.getElementById('importTripsTextInput');
+  const selectEl = document.getElementById('importTripsCarSelect');
+  const boxEl = document.getElementById('importTripsPreviewBox');
+  const countEl = document.getElementById('importPreviewCountLabel');
+  const sumEl = document.getElementById('importPreviewSummaryLabel');
+  const listEl = document.getElementById('importTripsPreviewList');
+
+  const carIdx = selectEl ? (parseInt(selectEl.value, 10) || 0) : activeCarIndex;
+  const car = appCars[carIdx] || appCars[activeCarIndex];
+  const raw = txtEl ? txtEl.value : '';
+
+  pendingImportedTrips = parseImportTripsText(raw, car);
+
+  if (!boxEl || !listEl) return;
+  if (pendingImportedTrips.length === 0) {
+    boxEl.classList.add('hidden');
+    return;
+  }
+
+  boxEl.classList.remove('hidden');
+  const totKm = pendingImportedTrips.reduce((a, t) => a + t.km, 0);
+  const totCost = pendingImportedTrips.reduce((a, t) => a + t.cost, 0);
+
+  if (countEl) countEl.innerText = `✓ ${pendingImportedTrips.length} Tragitti pronti`;
+  if (sumEl) sumEl.innerText = `${totKm.toFixed(1)} km • € ${totCost.toFixed(2).replace('.', ',')}`;
+
+  listEl.innerHTML = pendingImportedTrips.map(t => `
+    <div class="p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-between text-[10px]">
+      <div class="truncate pr-2">
+        <div class="font-bold text-[var(--text-main)] truncate">${t.title}</div>
+        <div class="text-[9px] text-[var(--text-muted)]">${t.isoDate} • ${t.durationMinutes} min (~${t.avgSpeed} km/h)</div>
+      </div>
+      <div class="text-right font-mono whitespace-nowrap">
+        <div class="font-bold text-cyan-400">${t.km} km • ${t.consumption.toFixed(2).replace('.', ',')} L/100</div>
+        <div class="text-[9px] text-amber-400 font-bold">€ ${t.cost.toFixed(2).replace('.', ',')} (${t.driveProfile})</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function confirmImportTrips() {
+  const selectEl = document.getElementById('importTripsCarSelect');
+  const carIdx = selectEl ? (parseInt(selectEl.value, 10) || 0) : activeCarIndex;
+  const car = appCars[carIdx] || appCars[activeCarIndex];
+
+  previewImportTripsData();
+  if (!pendingImportedTrips || pendingImportedTrips.length === 0) {
+    alert("Inserisci o carica almeno un tragitto valido (es. Data, Tratta, Km, Minuti) prima di importare.");
+    return;
+  }
+
+  let totKmAdded = 0;
+  pendingImportedTrips.forEach(t => {
+    totKmAdded += t.km;
+    car.trips.unshift(t);
+  });
+
+  car.currentOdo = (car.currentOdo || 0) + Math.round(totKmAdded);
+  car.trips.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  activeCarIndex = carIdx;
+  saveCars();
+  clearImportTripsInput();
+  closeModal('modalImportTrips');
+  switchTab('trips');
+  renderAll();
+
+  const banner = document.getElementById('iosNotificationBanner');
+  const msg = document.getElementById('notifBannerMessage');
+  if (banner && msg) {
+    msg.innerHTML = `📥 <b>Importazione Completata:</b> Aggiunti tragitti per un totale di <b>${totKmAdded.toFixed(1)} km</b> su <b>${car.name}</b> con calcolo dinamico L/100km.`;
+    banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 5000);
+  }
+}
+
 // Inizializzazione al caricamento
 document.addEventListener('DOMContentLoaded', () => {
   applyAppTheme(isDarkMode);
   initChartInteractions();
   initDriveHoursChartInteractions();
   initCalendarSystemClockSync();
+  restorePersistedBtSession();
   renderAll();
   renderCalendar();
   setupNavbarScrollBehavior();
+  handleIncomingAutomationUrl();
 });
 
