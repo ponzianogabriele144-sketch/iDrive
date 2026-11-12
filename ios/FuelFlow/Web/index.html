@@ -91,8 +91,15 @@
       user-select: none;
     }
     #quickSettingsOverlay {
-      padding-top: max(calc(env(safe-area-inset-top) + 12px), 52px);
-      padding-bottom: max(calc(env(safe-area-inset-bottom) + 16px), 24px);
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background-color: #000000 !important;
+      padding-top: max(calc(env(safe-area-inset-top) + 14px), 52px);
+      padding-bottom: max(calc(env(safe-area-inset-bottom) + 18px), 24px);
+    }
+    #quickSettingsMenuPanel {
+      background-color: #000000 !important;
     }
 
     @media print {
@@ -1757,10 +1764,10 @@
     </div>
   </div>
 
-  <!-- ==================== PIANO DEDICATO: PANNELLO CONTROLLI & IMPOSTAZIONI (SFONDO NERO PURO) ==================== -->
-  <div id="quickSettingsOverlay" onclick="closeQuickSettingsMenu()" class="fixed inset-0 z-[90] hidden bg-black/80 backdrop-blur-md flex justify-center items-start px-3.5 overflow-y-auto transition-opacity duration-200">
-    <div class="w-full max-w-lg flex justify-end">
-      <div id="quickSettingsMenuPanel" onclick="event.stopPropagation()" class="w-full max-w-[345px] bg-[#000000] border border-zinc-800 rounded-3xl shadow-[0_24px_70px_rgba(0,0,0,0.98)] p-3.5 space-y-2 text-xs text-white transform transition-all duration-200 scale-95 opacity-0">
+  <!-- ==================== PIANO DEDICATO: CENTRO CONTROLLO FULL-BLACK (ZERO SOVRAPPOSIZIONE) ==================== -->
+  <div id="quickSettingsOverlay" onclick="closeQuickSettingsMenu()" class="fixed inset-0 z-[9999] hidden bg-black flex justify-center items-start px-3.5 overflow-y-auto transition-opacity duration-150">
+    <div class="w-full max-w-lg mx-auto">
+      <div id="quickSettingsMenuPanel" onclick="event.stopPropagation()" class="w-full bg-black border border-zinc-800 rounded-3xl p-4 space-y-3 text-xs text-white transform transition-all duration-150 scale-95 opacity-0">
         
         <!-- Intestazione Pannello -->
         <div class="px-1.5 pb-2 border-b border-zinc-800 flex items-center justify-between">

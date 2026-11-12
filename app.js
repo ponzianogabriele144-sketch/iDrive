@@ -375,6 +375,7 @@ function toggleQuickSettingsMenu(event) {
 function openQuickSettingsMenu() {
   const overlay = document.getElementById('quickSettingsOverlay');
   const panel = document.getElementById('quickSettingsMenuPanel');
+  const mainEl = document.getElementById('appMain');
   if (!overlay) return;
 
   if (quickMenuCloseTimer) {
@@ -384,6 +385,7 @@ function openQuickSettingsMenu() {
 
   updateHeaderMenuStatusUI();
   overlay.classList.remove('hidden');
+  if (mainEl) mainEl.classList.add('invisible', 'pointer-events-none');
   if (typeof document !== 'undefined' && document.body) {
     document.body.style.overflow = 'hidden';
   }
@@ -398,12 +400,15 @@ function openQuickSettingsMenu() {
 function closeQuickSettingsMenu(immediate = false) {
   const overlay = document.getElementById('quickSettingsOverlay');
   const panel = document.getElementById('quickSettingsMenuPanel');
+  const mainEl = document.getElementById('appMain');
   if (!overlay || overlay.classList.contains('hidden')) return;
 
   if (quickMenuCloseTimer) {
     clearTimeout(quickMenuCloseTimer);
     quickMenuCloseTimer = null;
   }
+
+  if (mainEl) mainEl.classList.remove('invisible', 'pointer-events-none');
 
   if (immediate) {
     if (panel) {
