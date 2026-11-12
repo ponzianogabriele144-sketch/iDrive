@@ -355,18 +355,111 @@ function saveCars() {
   }
 }
 
-// ==================== MENU RAPIDO UNIFICATO (3 STANGHETTE / INGRANAGGIO) ====================
+// ==================== MENU RAPIDO UNIFICATO SU PIANO DEDICATO (SFONDO NERO) ====================
+let quickMenuCloseTimer = null;
+
 function toggleQuickSettingsMenu(event) {
-  if (event) event.stopPropagation();
-  const menu = document.getElementById('quickSettingsMenuDropdown');
-  if (!menu) return;
-  menu.classList.toggle('hidden');
-  updateHeaderMenuStatusUI();
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const overlay = document.getElementById('quickSettingsOverlay');
+  if (!overlay) return;
+  if (overlay.classList.contains('hidden')) {
+    openQuickSettingsMenu();
+  } else {
+    closeQuickSettingsMenu();
+  }
 }
 
-function closeQuickSettingsMenu() {
-  const menu = document.getElementById('quickSettingsMenuDropdown');
-  if (menu) menu.classList.add('hidden');
+function openQuickSettingsMenu() {
+  const overlay = document.getElementById('quickSettingsOverlay');
+  const panel = document.getElementById('quickSettingsMenuPanel');
+  if (!overlay) return;
+
+  if (quickMenuCloseTimer) {
+    clearTimeout(quickMenuCloseTimer);
+    quickMenuCloseTimer = null;
+  }
+
+  updateHeaderMenuStatusUI();
+  overlay.classList.remove('hidden');
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.style.overflow = 'hidden';
+  }
+  if (panel) {
+    requestAnimationFrame(() => {
+      panel.classList.remove('scale-95', 'opacity-0');
+      panel.classList.add('scale-100', 'opacity-100');
+    });
+  }
+}
+
+function closeQuickSettingsMenu(immediate = false) {
+  const overlay = document.getElementById('quickSettingsOverlay');
+  const panel = document.getElementById('quickSettingsMenuPanel');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+
+  if (quickMenuCloseTimer) {
+    clearTimeout(quickMenuCloseTimer);
+    quickMenuCloseTimer = null;
+  }
+
+  if (immediate) {
+    if (panel) {
+      panel.classList.remove('scale-100', 'opacity-100');
+      panel.classList.add('scale-95', 'opacity-0');
+    }
+    overlay.classList.add('hidden');
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.overflow = '';
+    }
+    return;
+  }
+
+  if (panel) {
+    panel.classList.remove('scale-100', 'opacity-100');
+    panel.classList.add('scale-95', 'opacity-0');
+  }
+  quickMenuCloseTimer = setTimeout(() => {
+    quickMenuCloseTimer = null;
+    overlay.classList.add('hidden');
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.overflow = '';
+    }
+  }, 130);
+}
+
+function openModalFromMenu(modalId) {
+  closeQuickSettingsMenu(true);
+  openModal(modalId);
+}
+
+function openGeminiVoiceFromMenu() {
+  closeQuickSettingsMenu(true);
+  openModalGeminiVoice();
+}
+
+function openAddCarFromMenu() {
+  closeQuickSettingsMenu(true);
+  openModalAddCar();
+}
+
+function openEditCarFromMenu() {
+  closeQuickSettingsMenu(true);
+  openModalEditCar(activeCarIndex);
+}
+
+function toggleBtSimFromMenu() {
+  toggleBtSim();
+  updateHeaderMenuStatusUI();
+  setTimeout(() => closeQuickSettingsMenu(), 120);
+}
+
+function toggleGpsLiveFromMenu() {
+  toggleGpsLive();
+  updateHeaderMenuStatusUI();
+  setTimeout(() => closeQuickSettingsMenu(), 120);
 }
 
 function updateHeaderMenuStatusUI() {
@@ -380,6 +473,28 @@ function updateHeaderMenuStatusUI() {
   const themeBadge = document.getElementById('menuThemeStateBadge');
   if (themeBadge) {
     themeBadge.innerText = isDarkMode ? 'Scuro 🌙' : 'Chiaro ☀️';
+  }
+
+  const btBadge = document.getElementById('btHeaderLabel');
+  if (btBadge) {
+    if (btSession.active) {
+      btBadge.innerText = 'In Viaggio 🟢';
+      btBadge.className = 'px-2.5 py-1 rounded-xl text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap';
+    } else {
+      btBadge.innerText = 'BT Auto';
+      btBadge.className = 'px-2.5 py-1 rounded-xl text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 whitespace-nowrap';
+    }
+  }
+
+  const gpsBadge = document.getElementById('gpsMenuStateBadge');
+  if (gpsBadge) {
+    if (liveTracking.active) {
+      gpsBadge.className = 'px-2.5 py-1 rounded-xl text-[10px] font-bold bg-red-600 text-white border border-red-500 flex items-center gap-1 whitespace-nowrap';
+      gpsBadge.innerHTML = '■ Stop GPS';
+    } else {
+      gpsBadge.className = 'px-2.5 py-1 rounded-xl text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 whitespace-nowrap';
+      gpsBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Avvia';
+    }
   }
 
   const dot = document.getElementById('quickMenuActiveDot');
@@ -403,13 +518,9 @@ function updateHeaderMenuStatusUI() {
 }
 
 if (typeof document !== 'undefined') {
-  document.addEventListener('click', (e) => {
-    const menu = document.getElementById('quickSettingsMenuDropdown');
-    const btn = document.getElementById('btnQuickMenuToggle');
-    if (menu && !menu.classList.contains('hidden')) {
-      if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
-        menu.classList.add('hidden');
-      }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeQuickSettingsMenu();
     }
   });
 }
@@ -1777,6 +1888,11 @@ function renderGaragePills() {
   const container = document.getElementById('garagePillsContainer');
   if (!container) return;
 
+  const headerSub = document.getElementById('headerSubtitleLabel');
+  if (headerSub) {
+    headerSub.innerText = `Gestione Spese • ${appCars.length} Auto`;
+  }
+
   const headerLabel = document.getElementById('garageHeaderLabel');
   if (headerLabel) {
     headerLabel.innerText = `Garage Personale (${appCars.length} ${appCars.length === 1 ? 'Veicolo' : 'Veicoli'})`;
@@ -2739,8 +2855,9 @@ function updateBtLiveUI() {
 
   const m = Math.floor(elapsedSec / 60);
   const s = elapsedSec % 60;
+  const timeText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   const timerEl = document.getElementById('btLiveTimer');
-  if (timerEl) timerEl.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  if (timerEl) timerEl.innerText = timeText;
 
   const liveKmEl = document.getElementById('btLiveKm');
   if (liveKmEl) liveKmEl.innerText = `${btSession.km.toFixed(1)} km`;
@@ -2753,6 +2870,14 @@ function updateBtLiveUI() {
 
   const liveSpeedEl = document.getElementById('btLiveSpeed');
   if (liveSpeedEl) liveSpeedEl.innerText = btSession.km > 0.05 ? `${dyn.avgSpeed} km/h` : `In marcia`;
+
+  // Aggiorna anche il banner BT globale visibile su tutte le schede
+  const bTimer = document.getElementById('bannerBtTimer');
+  if (bTimer) bTimer.innerText = timeText;
+  const bKm = document.getElementById('bannerBtKm');
+  if (bKm) bKm.innerText = `${btSession.km.toFixed(1)} km`;
+  const bCons = document.getElementById('bannerBtCons');
+  if (bCons) bCons.innerText = `${dyn.consumptionL100.toFixed(2).replace('.', ',')} L/100`;
 
   updateHeaderMenuStatusUI();
 }
@@ -2836,6 +2961,9 @@ function applyBtConnectedUI(car) {
   const tripBox = document.getElementById('btLiveTripBox');
   if (tripBox) tripBox.classList.remove('hidden');
 
+  const liveBtBanner = document.getElementById('liveBtBanner');
+  if (liveBtBanner) liveBtBanner.classList.remove('hidden');
+
   const btnConn = document.getElementById('btnBtConnect');
   if (btnConn) {
     btnConn.disabled = true;
@@ -2915,6 +3043,9 @@ async function triggerBtDisconnect(options = {}) {
   }
   const tripBox = document.getElementById('btLiveTripBox');
   if (tripBox) tripBox.classList.add('hidden');
+
+  const liveBtBanner = document.getElementById('liveBtBanner');
+  if (liveBtBanner) liveBtBanner.classList.add('hidden');
 
   const btnConn = document.getElementById('btnBtConnect');
   if (btnConn) {

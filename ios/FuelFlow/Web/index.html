@@ -85,6 +85,15 @@
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
+    button, [role="button"], a, select {
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #quickSettingsOverlay {
+      padding-top: max(calc(env(safe-area-inset-top) + 12px), 52px);
+      padding-bottom: max(calc(env(safe-area-inset-bottom) + 16px), 24px);
+    }
 
     @media print {
       body * { visibility: hidden; }
@@ -111,127 +120,26 @@
               <h1 class="text-base font-black leading-none tracking-tight text-[var(--text-main)]">iDrive</h1>
               <span class="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border border-amber-500/30">PRO</span>
             </div>
-            <p class="text-[10px] text-[var(--text-muted)] mt-0.5 font-medium">Gestione Spese • 3 Auto</p>
+            <p id="headerSubtitleLabel" class="text-[10px] text-[var(--text-muted)] mt-0.5 font-medium">Gestione Spese • 3 Auto</p>
           </div>
         </div>
 
-        <!-- Menu Unificato & Controlli Rapidi Ordinati (3 Stanghette / Ingranaggio) -->
-        <div class="relative flex items-center gap-1.5">
+        <!-- Controlli Superiori Puliti: Pillola Live + Menu Unico (3 Stanghette / Ingranaggio) -->
+        <div class="flex items-center gap-2">
           <!-- Pillola Stato Live (visibile solo quando BT o GPS è attivo) -->
-          <button id="headerLiveStatusPill" onclick="toggleQuickSettingsMenu()" class="hidden px-2.5 py-1 rounded-xl text-[10.5px] font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 items-center gap-1.5 transition active:scale-95">
+          <button type="button" id="headerLiveStatusPill" onclick="switchTab('trips')" class="hidden min-h-[38px] px-2.5 py-1.5 rounded-2xl text-[10.5px] font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 items-center gap-1.5 transition active:scale-95 shadow-sm">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
             <span id="headerLiveStatusText">Live</span>
           </button>
 
-          <!-- Assistente Vocale Gemini AI Rapido -->
-          <button id="btnHeaderGemini" onclick="openModalGeminiVoice()" title="Assistente Vocale Gemini AI" class="min-h-[38px] px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500/15 to-indigo-500/15 hover:from-purple-500/25 hover:to-indigo-500/25 border border-purple-500/30 text-purple-300 flex items-center gap-1 transition shadow-sm active:scale-95">
-            <span class="text-xs">✨</span> <span>AI</span>
-          </button>
-
-          <!-- Tasto Unico Menu Generale (3 Stanghette ☰ + Ingranaggio ⚙️) -->
-          <button id="btnQuickMenuToggle" onclick="toggleQuickSettingsMenu(event)" title="Menu Impostazioni, Bluetooth, GPS e Gestione Auto" class="relative min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)] flex items-center gap-1.5 transition shadow-sm active:scale-95">
+          <!-- Tasto Unico Menu Impostazioni (3 Stanghette ☰ + Ingranaggio ⚙️) -->
+          <button type="button" id="btnQuickMenuToggle" onclick="toggleQuickSettingsMenu(event)" title="Apri Pannello Impostazioni, Bluetooth, GPS e Garage" class="relative min-h-[40px] min-w-[54px] px-3 py-2 rounded-2xl text-xs font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-sub)] text-[var(--text-main)] border border-[var(--border-color)] flex items-center justify-center gap-1.5 transition-all duration-150 shadow-sm active:scale-90">
             <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M4 6h16M4 12h16M4 18h16"/>
             </svg>
-            <span class="text-xs">⚙️</span>
-            <span id="quickMenuActiveDot" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-zinc-900 animate-pulse"></span>
+            <span class="text-sm leading-none">⚙️</span>
+            <span id="quickMenuActiveDot" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-zinc-950 animate-pulse"></span>
           </button>
-
-          <!-- Menu a Tendina Ordinato con Tutte le Funzioni Rapide -->
-          <div id="quickSettingsMenuDropdown" class="hidden absolute right-0 top-[46px] w-72 rounded-2xl bg-[var(--modal-bg)]/95 backdrop-blur-2xl border border-[var(--border-color)] shadow-2xl p-2 z-50 space-y-1 text-xs">
-            <div class="px-2.5 py-1.5 border-b border-[var(--border-color)] flex items-center justify-between">
-              <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-500 flex items-center gap-1">⚙️ Pannello Controlli & Garage</span>
-              <button type="button" onclick="closeQuickSettingsMenu()" class="text-[var(--text-muted)] hover:text-[var(--text-main)] text-xs px-1">✕</button>
-            </div>
-
-            <!-- 1. Modalità Notte / Giorno -->
-            <button type="button" onclick="toggleAppTheme()" id="btnThemeToggle" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
-              <div class="flex items-center gap-2.5">
-                <span id="themeEmoji" class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-sm">🌙</span>
-                <div>
-                  <div class="font-bold text-[var(--text-main)] text-xs">Modalità Notte / Giorno</div>
-                  <div class="text-[9.5px] text-[var(--text-muted)]">Cambia tema visivo dell'app</div>
-                </div>
-              </div>
-              <span id="menuThemeStateBadge" class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-sub)]">Scuro</span>
-            </button>
-
-            <!-- 2. Bluetooth Auto-Start -->
-            <button type="button" onclick="toggleBtSim(); closeQuickSettingsMenu();" id="btnHeaderBt" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
-              <div class="flex items-center gap-2.5">
-                <span class="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-sm">📶</span>
-                <div>
-                  <div class="font-bold text-[var(--text-main)] text-xs">Bluetooth Auto-Start</div>
-                  <div class="text-[9.5px] text-[var(--text-muted)]">Avvia/Termina guida e salva sosta</div>
-                </div>
-              </div>
-              <span id="btHeaderLabel" class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">BT Auto</span>
-            </button>
-
-            <!-- 3. Tracciamento GPS Live Reale -->
-            <button type="button" onclick="toggleGpsLive(); closeQuickSettingsMenu();" id="btnHeaderGps" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
-              <div class="flex items-center gap-2.5">
-                <span class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-sm">🛰️</span>
-                <div>
-                  <div class="font-bold text-[var(--text-main)] text-xs">Tracciamento GPS Reale</div>
-                  <div class="text-[9.5px] text-[var(--text-muted)]">Km, tempo e L/100km in diretta</div>
-                </div>
-              </div>
-              <span id="gpsMenuStateBadge" class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> GPS
-              </span>
-            </button>
-
-            <!-- 4. Automazione Comandi Rapidi iOS (Opzione 4) -->
-            <button type="button" onclick="closeQuickSettingsMenu(); openModal('modalIosShortcuts');" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
-              <div class="flex items-center gap-2.5">
-                <span class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-sm">⚡</span>
-                <div>
-                  <div class="font-bold text-[var(--text-main)] text-xs">Automazione iOS (Opzione 4)</div>
-                  <div class="text-[9.5px] text-[var(--text-muted)]">Link Comandi Rapidi BT & Mappe</div>
-                </div>
-              </div>
-              <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">Link ➔</span>
-            </button>
-
-            <!-- 5. Importa Tragitti (CSV / OBD2 / App Esterne) -->
-            <button type="button" onclick="closeQuickSettingsMenu(); openModal('modalImportTrips');" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
-              <div class="flex items-center gap-2.5">
-                <span class="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-sm">📥</span>
-                <div>
-                  <div class="font-bold text-[var(--text-main)] text-xs">Importa Tragitti (OBD2 / CSV)</div>
-                  <div class="text-[9.5px] text-[var(--text-muted)]">Carica da app esterne o testo</div>
-                </div>
-              </div>
-              <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">Importa</span>
-            </button>
-
-            <div class="border-t border-[var(--border-color)] my-1"></div>
-
-            <!-- 6. Aggiungi Nuova Auto -->
-            <button type="button" onclick="closeQuickSettingsMenu(); openModalAddCar();" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
-              <div class="flex items-center gap-2.5">
-                <span class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-sm">➕</span>
-                <div>
-                  <div class="font-bold text-[var(--text-main)] text-xs">Aggiungi Nuova Auto</div>
-                  <div class="text-[9.5px] text-[var(--text-muted)]">Inserisci un veicolo nel garage</div>
-                </div>
-              </div>
-              <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500 text-black">+ Auto</span>
-            </button>
-
-            <!-- 7. Modifica Auto Attiva -->
-            <button type="button" onclick="closeQuickSettingsMenu(); openModalEditCar(activeCarIndex);" class="w-full px-2.5 py-2 rounded-xl hover:bg-[var(--bg-sub)] flex items-center justify-between transition active:scale-[0.99] text-left">
-              <div class="flex items-center gap-2.5">
-                <span class="w-7 h-7 rounded-lg bg-zinc-500/15 border border-zinc-500/30 text-[var(--text-main)] flex items-center justify-center text-sm">✏️</span>
-                <div>
-                  <div class="font-bold text-[var(--text-main)] text-xs">Modifica Auto Attiva</div>
-                  <div id="menuEditCarSub" class="text-[9.5px] text-[var(--text-muted)]">Nome, consumo L/100km e Bluetooth</div>
-                </div>
-              </div>
-              <span class="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-[var(--bg-sub)] border border-[var(--border-color)] text-[var(--text-sub)]">Modifica</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -239,8 +147,8 @@
       <div class="space-y-1.5 pt-0.5">
         <div class="flex items-center justify-between px-1">
           <span id="garageHeaderLabel" class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Garage Personale (3 Veicoli)</span>
-          <button onclick="toggleQuickSettingsMenu(event)" class="text-[10px] font-semibold text-[var(--text-muted)] hover:text-amber-400 flex items-center gap-1 transition py-0.5">
-            <span>⚙️ Gestisci Auto & Strumenti</span>
+          <button type="button" onclick="toggleQuickSettingsMenu(event)" class="text-[10px] font-semibold text-[var(--text-muted)] hover:text-amber-400 flex items-center gap-1 transition px-2 py-0.5 rounded-lg active:scale-95">
+            <span>⚙️ Strumenti & Auto</span>
           </button>
         </div>
 
@@ -266,13 +174,13 @@
         <span>Odometro:</span>
         <span id="labelCarOdo" class="font-bold text-[var(--text-main)] font-mono">0 km</span>
       </div>
-      <button onclick="openModalEditCar(activeCarIndex)" class="text-[10px] text-[var(--text-muted)] hover:text-amber-500">
+      <button type="button" onclick="openModalEditCar(activeCarIndex)" class="text-[10px] text-[var(--text-muted)] hover:text-amber-500 px-2 py-1 rounded-lg active:scale-95 transition">
         ✏️ Modifica
       </button>
     </div>
 
     <!-- Active GPS Banner -->
-    <div id="liveGpsBanner" class="hidden bg-emerald-950/80 border-b border-emerald-500/30 px-4 py-2.5 flex items-center justify-between sticky top-[135px] z-20 backdrop-blur-sm">
+    <div id="liveGpsBanner" class="hidden bg-emerald-950/95 border-b border-emerald-500/40 px-4 py-2.5 flex items-center justify-between z-20">
       <div class="flex items-center gap-2.5">
         <span class="w-3 h-3 rounded-full bg-emerald-400 pulse-dot"></span>
         <div>
@@ -280,13 +188,27 @@
           <div class="text-[11px] text-emerald-400/90 font-mono"><span id="gpsLiveKm">0.00</span> km • <span id="gpsLiveTimer">00:00</span></div>
         </div>
       </div>
-      <button onclick="stopGpsLive()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black transition">
+      <button type="button" onclick="stopGpsLive()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black transition active:scale-95 shadow-sm">
         Termina & Salva
       </button>
     </div>
 
-    <!-- Floating Notification Banner (iOS 8:00 AM Resoconto 24h & Assicurazione) -->
-    <div id="iosNotificationBanner" class="hidden absolute top-16 left-3 right-3 z-50 bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl p-3 shadow-2xl flex items-start gap-2.5 transition-all">
+    <!-- Active Bluetooth Live Banner (visibile in tutte le schede quando BT è attivo) -->
+    <div id="liveBtBanner" class="hidden bg-indigo-950/95 border-b border-indigo-500/40 px-4 py-2.5 flex items-center justify-between z-20">
+      <div class="flex items-center gap-2.5">
+        <span class="w-3 h-3 rounded-full bg-indigo-400 pulse-dot"></span>
+        <div>
+          <div class="text-xs font-bold text-indigo-200">Bluetooth Auto Attivo 📶</div>
+          <div class="text-[11px] text-indigo-300 font-mono"><span id="bannerBtKm">0.0 km</span> • <span id="bannerBtTimer">00:00</span> • <span id="bannerBtCons">-- L/100</span></div>
+        </div>
+      </div>
+      <button type="button" onclick="triggerBtDisconnect()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-500 text-white transition active:scale-95 shadow-sm">
+        🅿️ Arrivo & Sosta
+      </button>
+    </div>
+
+    <!-- Floating Notification Banner (Sfondo solido anti-sovrapposizione) -->
+    <div id="iosNotificationBanner" class="hidden absolute top-16 left-3 right-3 z-[60] bg-[var(--modal-bg)] border border-amber-500/40 rounded-2xl p-3.5 shadow-2xl flex items-start gap-2.5 transition-all">
       <div class="w-8 h-8 rounded-xl bg-amber-500 text-black flex items-center justify-center font-bold text-sm shadow">
         ⛽
       </div>
@@ -1831,6 +1753,137 @@
       <div class="flex gap-2 pt-1">
         <button onclick="closeModal('modalEditInsurance')" class="flex-1 py-2 rounded-xl bg-zinc-700/40 text-[var(--text-sub)] text-xs">Annulla</button>
         <button onclick="saveInsuranceEdit()" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow">Salva Polizza</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PIANO DEDICATO: PANNELLO CONTROLLI & IMPOSTAZIONI (SFONDO NERO PURO) ==================== -->
+  <div id="quickSettingsOverlay" onclick="closeQuickSettingsMenu()" class="fixed inset-0 z-[90] hidden bg-black/80 backdrop-blur-md flex justify-center items-start px-3.5 overflow-y-auto transition-opacity duration-200">
+    <div class="w-full max-w-lg flex justify-end">
+      <div id="quickSettingsMenuPanel" onclick="event.stopPropagation()" class="w-full max-w-[345px] bg-[#000000] border border-zinc-800 rounded-3xl shadow-[0_24px_70px_rgba(0,0,0,0.98)] p-3.5 space-y-2 text-xs text-white transform transition-all duration-200 scale-95 opacity-0">
+        
+        <!-- Intestazione Pannello -->
+        <div class="px-1.5 pb-2 border-b border-zinc-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-sm">⚙️</span>
+            <div>
+              <div class="font-black text-xs text-white tracking-tight">Centro Controllo</div>
+              <div class="text-[9.5px] text-zinc-400">Impostazioni, Bluetooth, GPS & Garage</div>
+            </div>
+          </div>
+          <button type="button" onclick="closeQuickSettingsMenu()" class="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:scale-95 border border-zinc-800 text-zinc-300 font-bold text-xs transition">
+            ✕ Chiudi
+          </button>
+        </div>
+
+        <!-- Sezione Controlli & Tracciamento -->
+        <div class="space-y-1.5">
+          <div class="px-1.5 text-[9.5px] font-extrabold uppercase tracking-wider text-zinc-500">Tracciamento & Aspetto</div>
+
+          <!-- 1. Modalità Notte / Giorno -->
+          <button type="button" onclick="toggleAppTheme()" id="btnThemeToggle" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span id="themeEmoji" class="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-base flex-shrink-0">🌙</span>
+              <div>
+                <div class="font-bold text-white text-xs">Modalità Notte / Giorno</div>
+                <div class="text-[10px] text-zinc-400">Cambia tema visivo dell'app</div>
+              </div>
+            </div>
+            <span id="menuThemeStateBadge" class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-200 whitespace-nowrap">Scuro 🌙</span>
+          </button>
+
+          <!-- 2. Bluetooth Auto-Start -->
+          <button type="button" onclick="toggleBtSimFromMenu()" id="btnHeaderBt" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center text-base flex-shrink-0">📶</span>
+              <div>
+                <div class="font-bold text-white text-xs">Bluetooth Auto-Start</div>
+                <div class="text-[10px] text-zinc-400">Avvia/Termina guida e salva sosta</div>
+              </div>
+            </div>
+            <span id="btHeaderLabel" class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 whitespace-nowrap">BT Auto</span>
+          </button>
+
+          <!-- 3. Tracciamento GPS Live Reale -->
+          <button type="button" onclick="toggleGpsLiveFromMenu()" id="btnHeaderGps" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-base flex-shrink-0">🛰️</span>
+              <div>
+                <div class="font-bold text-white text-xs">Tracciamento GPS Reale</div>
+                <div class="text-[10px] text-zinc-400">Km, tempo e L/100km in diretta</div>
+              </div>
+            </div>
+            <span id="gpsMenuStateBadge" class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 whitespace-nowrap">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Avvia
+            </span>
+          </button>
+
+          <!-- 4. Automazione Comandi Rapidi iOS (Opzione 4) -->
+          <button type="button" onclick="openModalFromMenu('modalIosShortcuts')" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-base flex-shrink-0">⚡</span>
+              <div>
+                <div class="font-bold text-white text-xs">Automazione iOS (Comandi Rapidi)</div>
+                <div class="text-[10px] text-zinc-400">Link automatici BT & Mappe</div>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">Link ➔</span>
+          </button>
+
+          <!-- 5. Importa Tragitti (CSV / OBD2 / App Esterne) -->
+          <button type="button" onclick="openModalFromMenu('modalImportTrips')" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-base flex-shrink-0">📥</span>
+              <div>
+                <div class="font-bold text-white text-xs">Importa Tragitti (OBD2 / CSV)</div>
+                <div class="text-[10px] text-zinc-400">Carica da app esterne o testo</div>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 whitespace-nowrap">Importa</span>
+          </button>
+
+          <!-- 6. Dettatura Vocale Percorsi -->
+          <button type="button" onclick="openGeminiVoiceFromMenu()" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center text-base flex-shrink-0">🎙️</span>
+              <div>
+                <div class="font-bold text-white text-xs">Dettatura Vocale Percorsi</div>
+                <div class="text-[10px] text-zinc-400">Registra tratta parlando a voce</div>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">Parla</span>
+          </button>
+        </div>
+
+        <!-- Sezione Garage Veicoli -->
+        <div class="pt-1.5 border-t border-zinc-800 space-y-1.5">
+          <div class="px-1.5 text-[9.5px] font-extrabold uppercase tracking-wider text-zinc-500">Gestione Garage Auto</div>
+
+          <!-- 7. Aggiungi Nuova Auto -->
+          <button type="button" onclick="openAddCarFromMenu()" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-base flex-shrink-0">➕</span>
+              <div>
+                <div class="font-bold text-white text-xs">Aggiungi Nuova Auto</div>
+                <div class="text-[10px] text-zinc-400">Inserisci un veicolo nel garage</div>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-amber-500 text-black whitespace-nowrap">+ Auto</span>
+          </button>
+
+          <!-- 8. Modifica Auto Attiva -->
+          <button type="button" onclick="openEditCarFromMenu()" class="w-full min-h-[50px] px-3 py-2.5 rounded-2xl bg-[#0e0e11] hover:bg-zinc-900 active:bg-zinc-800 active:scale-[0.98] border border-zinc-800/90 flex items-center justify-between gap-2 transition text-left">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-zinc-800 border border-zinc-700 text-white flex items-center justify-center text-base flex-shrink-0">✏️</span>
+              <div class="min-w-0">
+                <div class="font-bold text-white text-xs">Modifica Auto Attiva</div>
+                <div id="menuEditCarSub" class="text-[10px] text-zinc-400 truncate">Nome, consumo L/100km e Bluetooth</div>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-zinc-900 border border-zinc-700 text-zinc-200 whitespace-nowrap">Modifica</span>
+          </button>
+        </div>
+
       </div>
     </div>
   </div>
